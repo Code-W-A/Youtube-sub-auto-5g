@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Download, Copy, CheckCircle, FileText, Youtube, Package, Eye, Edit3, Save, X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useSearchParams } from "next/navigation"
 
 interface SubtitleFile {
   language: string
@@ -31,104 +32,78 @@ interface TitleDescription {
 
 export default function ResultsPage() {
   const { toast } = useToast()
+  const params = useSearchParams()
+  const jobId = params.get("jobId")
   const [editingTitle, setEditingTitle] = useState<string | null>(null)
   const [editingDescription, setEditingDescription] = useState<string | null>(null)
 
-  const [subtitleFiles] = useState<SubtitleFile[]>([
-    {
-      language: "ro",
-      languageName: "Română",
-      flag: "🇷🇴",
-      format: "srt",
-      size: "12.4 KB",
-      preview: "1\n00:00:01,000 --> 00:00:04,000\nBună ziua și bun venit la acest tutorial...",
-    },
-    {
-      language: "en",
-      languageName: "English",
-      flag: "🇺🇸",
-      format: "srt",
-      size: "11.8 KB",
-      preview: "1\n00:00:01,000 --> 00:00:04,000\nHello and welcome to this tutorial...",
-    },
-    {
-      language: "fr",
-      languageName: "Français",
-      flag: "🇫🇷",
-      format: "srt",
-      size: "13.1 KB",
-      preview: "1\n00:00:01,000 --> 00:00:04,000\nBonjour et bienvenue dans ce tutoriel...",
-    },
-    {
-      language: "es",
-      languageName: "Español",
-      flag: "🇪🇸",
-      format: "srt",
-      size: "12.7 KB",
-      preview: "1\n00:00:01,000 --> 00:00:04,000\nHola y bienvenidos a este tutorial...",
-    },
-    {
-      language: "de",
-      languageName: "Deutsch",
-      flag: "🇩🇪",
-      format: "srt",
-      size: "13.5 KB",
-      preview: "1\n00:00:01,000 --> 00:00:04,000\nHallo und willkommen zu diesem Tutorial...",
-    },
-  ])
+  const [projectTitle, setProjectTitle] = useState<string>("Rezultate procesare")
+  const [subtitleFiles, setSubtitleFiles] = useState<SubtitleFile[]>([])
+  const [titlesDescriptions, setTitlesDescriptions] = useState<TitleDescription[]>([])
 
-  const [titlesDescriptions, setTitlesDescriptions] = useState<TitleDescription[]>([
-    {
-      language: "ro",
-      languageName: "Română",
-      flag: "🇷🇴",
-      title: "Tutorial Complet Marketing Digital 2024 - Strategii Eficiente pentru Afacerea Ta",
-      description:
-        "Descoperă cele mai eficiente strategii de marketing digital în 2024! În acest tutorial complet, vei învăța cum să îți promovezi afacerea online, să atragi clienți noi și să îți crești vânzările folosind tehnicile moderne de marketing.\n\n🎯 Ce vei învăța:\n• Strategii SEO avansate\n• Marketing pe rețelele sociale\n• Publicitate online eficientă\n• Analiza competiției\n• Optimizarea conversiilor\n\n📈 Perfect pentru antreprenori, freelanceri și specialiști în marketing care vor să își dezvolte cunoștințele și să obțină rezultate concrete.\n\n#MarketingDigital #Antreprenoriat #SEO #SocialMedia #Afaceri",
-      titleMaxLength: 100,
-      descriptionMaxLength: 5000,
-    },
-    {
-      language: "en",
-      languageName: "English",
-      flag: "🇺🇸",
-      title: "Complete Digital Marketing Tutorial 2024 - Effective Strategies for Your Business",
-      description:
-        "Discover the most effective digital marketing strategies in 2024! In this comprehensive tutorial, you'll learn how to promote your business online, attract new customers, and increase your sales using modern marketing techniques.\n\n🎯 What you'll learn:\n• Advanced SEO strategies\n• Social media marketing\n• Effective online advertising\n• Competitor analysis\n• Conversion optimization\n\n📈 Perfect for entrepreneurs, freelancers, and marketing specialists who want to develop their knowledge and achieve concrete results.\n\n#DigitalMarketing #Entrepreneurship #SEO #SocialMedia #Business",
-      titleMaxLength: 100,
-      descriptionMaxLength: 5000,
-    },
-    {
-      language: "fr",
-      languageName: "Français",
-      flag: "🇫🇷",
-      title: "Tutoriel Marketing Digital Complet 2024 - Stratégies Efficaces pour Votre Entreprise",
-      description:
-        "Découvrez les stratégies de marketing digital les plus efficaces en 2024 ! Dans ce tutoriel complet, vous apprendrez comment promouvoir votre entreprise en ligne, attirer de nouveaux clients et augmenter vos ventes en utilisant les techniques marketing modernes.\n\n🎯 Ce que vous apprendrez :\n• Stratégies SEO avancées\n• Marketing sur les réseaux sociaux\n• Publicité en ligne efficace\n• Analyse de la concurrence\n• Optimisation des conversions\n\n📈 Parfait pour les entrepreneurs, freelances et spécialistes marketing qui souhaitent développer leurs connaissances et obtenir des résultats concrets.\n\n#MarketingDigital #Entrepreneuriat #SEO #ReseauxSociaux #Entreprise",
-      titleMaxLength: 100,
-      descriptionMaxLength: 5000,
-    },
-    {
-      language: "es",
-      languageName: "Español",
-      flag: "🇪🇸",
-      title: "Tutorial Completo Marketing Digital 2024 - Estrategias Efectivas para Tu Negocio",
-      description:
-        "¡Descubre las estrategias de marketing digital más efectivas en 2024! En este tutorial completo, aprenderás cómo promocionar tu negocio online, atraer nuevos clientes y aumentar tus ventas usando técnicas modernas de marketing.\n\n🎯 Lo que aprenderás:\n• Estrategias SEO avanzadas\n• Marketing en redes sociales\n• Publicidad online efectiva\n• Análisis de competencia\n• Optimización de conversiones\n\n📈 Perfecto para emprendedores, freelancers y especialistas en marketing que quieren desarrollar sus conocimientos y obtener resultados concretos.\n\n#MarketingDigital #Emprendimiento #SEO #RedesSociales #Negocios",
-      titleMaxLength: 100,
-      descriptionMaxLength: 5000,
-    },
-    {
-      language: "de",
-      languageName: "Deutsch",
-      flag: "🇩🇪",
-      title: "Komplettes Digital Marketing Tutorial 2024 - Effektive Strategien für Ihr Unternehmen",
-      description:
-        "Entdecken Sie die effektivsten Digital Marketing Strategien für 2024! In diesem umfassenden Tutorial lernen Sie, wie Sie Ihr Unternehmen online bewerben, neue Kunden gewinnen und Ihre Verkäufe mit modernen Marketing-Techniken steigern.\n\n🎯 Was Sie lernen werden:\n• Fortgeschrittene SEO-Strategien\n• Social Media Marketing\n• Effektive Online-Werbung\n• Konkurrenzanalyse\n• Conversion-Optimierung\n\n📈 Perfekt für Unternehmer, Freelancer und Marketing-Spezialisten, die ihr Wissen erweitern und konkrete Ergebnisse erzielen möchten.\n\n#DigitalMarketing #Unternehmertum #SEO #SocialMedia #Business",
-      titleMaxLength: 100,
-      descriptionMaxLength: 5000,
-    },
-  ])
+  const languageMeta: Record<string, { name: string; flag: string }> = useMemo(
+    () => ({
+      ro: { name: "Română", flag: "🇷🇴" },
+      en: { name: "English", flag: "🇺🇸" },
+      fr: { name: "Français", flag: "🇫🇷" },
+      es: { name: "Español", flag: "🇪🇸" },
+      de: { name: "Deutsch", flag: "🇩🇪" },
+      it: { name: "Italiano", flag: "🇮🇹" },
+      pt: { name: "Português", flag: "🇵🇹" },
+      ru: { name: "Русский", flag: "🇷🇺" },
+      ja: { name: "日本語", flag: "🇯🇵" },
+      ko: { name: "한국어", flag: "🇰🇷" },
+      zh: { name: "中文", flag: "🇨🇳" },
+    }),
+    [],
+  )
+
+  useEffect(() => {
+    if (!jobId) return
+    const load = async () => {
+      const jobRes = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`)
+      if (jobRes.ok) {
+        const job = await jobRes.json()
+        setProjectTitle(job.title || "Rezultate procesare")
+      }
+      const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/artifacts`)
+      if (!res.ok) return
+      const list = await res.json()
+      const subs: SubtitleFile[] = []
+      const titles: TitleDescription[] = []
+      for (const a of list as any[]) {
+        const meta = languageMeta[a.language] || { name: a.language.toUpperCase(), flag: "🌐" }
+        if (a.type === "subtitle-srt" || a.type === "subtitle-vtt") {
+          subs.push({
+            language: a.language,
+            languageName: meta.name,
+            flag: meta.flag,
+            format: a.type === "subtitle-srt" ? "srt" : "vtt",
+            size: `${Math.round((a.sizeBytes || 0) / 1024)} KB`,
+            preview: "",
+          })
+        }
+        if (a.type === "titles-descriptions") {
+          const content = await fetch(`/api/artifacts/${a.id}/download`).then((r) => r.text())
+          const [firstLine, ...rest] = content.split("\n")
+          const title = firstLine.replace(/^Title:\s*/i, "").trim() || projectTitle
+          const description = rest.join("\n").replace(/^Description:\s*/i, "").trim()
+          titles.push({
+            language: a.language,
+            languageName: meta.name,
+            flag: meta.flag,
+            title,
+            description,
+            titleMaxLength: 100,
+            descriptionMaxLength: 5000,
+          })
+        }
+      }
+      setSubtitleFiles(subs)
+      setTitlesDescriptions(titles)
+    }
+    load()
+  }, [jobId, languageMeta, projectTitle])
 
   const handleCopy = async (text: string, type: string) => {
     try {
@@ -168,8 +143,8 @@ export default function ResultsPage() {
                 <Youtube className="w-8 h-8 text-red-400" />
               </div>
               <div>
-                <h2 className="text-2xl font-semibold text-foreground">Tutorial Marketing Digital</h2>
-                <p className="text-muted-foreground">youtube.com/watch?v=abc123 • 12:34 min • Finalizat cu succes</p>
+                <h2 className="text-2xl font-semibold text-foreground">{projectTitle}</h2>
+                <p className="text-muted-foreground">Finalizat cu succes</p>
               </div>
             </div>
             <div className="flex items-center space-x-3">
@@ -177,7 +152,10 @@ export default function ResultsPage() {
                 <CheckCircle className="w-4 h-4 mr-1" />
                 Procesare completă
               </Badge>
-              <Button className="bg-primary hover:bg-primary/90 text-white">
+              <Button className="bg-primary hover:bg-primary/90 text-white" onClick={() => {
+                if (!jobId) return
+                window.location.href = `/api/jobs/${jobId}/package`
+              }}>
                 <Package className="w-4 h-4 mr-2" />
                 Descarcă toate
               </Button>
@@ -254,9 +232,9 @@ export default function ResultsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {subtitleFiles.map((file) => (
+                  {subtitleFiles.map((file, idx) => (
                     <div
-                      key={file.language}
+                      key={`${file.language}-${idx}`}
                       className="flex items-center justify-between p-4 border border-border rounded-lg bg-card"
                     >
                       <div className="flex items-center space-x-4">
@@ -269,15 +247,32 @@ export default function ResultsPage() {
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Button variant="outline" size="sm" className="border-border bg-transparent">
+                        <Button variant="outline" size="sm" className="border-border bg-transparent" onClick={async () => {
+                          try {
+                            const artifacts = await fetch(`/api/jobs/${jobId}/artifacts`).then(r => r.json())
+                            const srt = artifacts.find((a: any) => a.language === file.language && a.type === "subtitle-srt")
+                            if (srt) {
+                              const txt = await fetch(`/api/artifacts/${srt.id}/download`).then(r => r.text())
+                              toast({ title: "Preview", description: txt.slice(0, 200) + (txt.length > 200 ? "..." : "") })
+                            }
+                          } catch {}
+                        }}>
                           <Eye className="w-4 h-4 mr-2" />
                           Preview
                         </Button>
-                        <Button variant="outline" size="sm" className="border-border bg-transparent">
+                        <Button variant="outline" size="sm" className="border-border bg-transparent" onClick={async () => {
+                          const artifacts = await fetch(`/api/jobs/${jobId}/artifacts`).then(r => r.json())
+                          const srt = artifacts.find((a: any) => a.language === file.language && a.type === "subtitle-srt")
+                          if (srt) window.location.href = `/api/artifacts/${srt.id}/download`
+                        }}>
                           <Download className="w-4 h-4 mr-2" />
                           .srt
                         </Button>
-                        <Button variant="outline" size="sm" className="border-border bg-transparent">
+                        <Button variant="outline" size="sm" className="border-border bg-transparent" onClick={async () => {
+                          const artifacts = await fetch(`/api/jobs/${jobId}/artifacts`).then(r => r.json())
+                          const vtt = artifacts.find((a: any) => a.language === file.language && a.type === "subtitle-vtt")
+                          if (vtt) window.location.href = `/api/artifacts/${vtt.id}/download`
+                        }}>
                           <Download className="w-4 h-4 mr-2" />
                           .vtt
                         </Button>
@@ -286,7 +281,14 @@ export default function ResultsPage() {
                   ))}
                 </div>
                 <div className="mt-6 text-center">
-                  <Button className="bg-primary hover:bg-primary/90 text-white">
+                  <Button className="bg-primary hover:bg-primary/90 text-white" onClick={async () => {
+                    const artifacts = await fetch(`/api/jobs/${jobId}/artifacts`).then(r => r.json())
+                    for (const a of artifacts) {
+                      if (a.type === "subtitle-srt" || a.type === "subtitle-vtt") {
+                        window.open(`/api/artifacts/${a.id}/download`, "_blank")
+                      }
+                    }
+                  }}>
                     <Download className="w-4 h-4 mr-2" />
                     Descarcă toate subtitrările
                   </Button>
@@ -473,7 +475,10 @@ export default function ResultsPage() {
                         <p className="text-sm text-muted-foreground mb-4">
                           Toate fișierele organizate în foldere structurate
                         </p>
-                        <Button className="w-full bg-primary hover:bg-primary/90 text-white">
+                        <Button className="w-full bg-primary hover:bg-primary/90 text-white" onClick={() => {
+                          if (!jobId) return
+                          window.location.href = `/api/jobs/${jobId}/package`
+                        }}>
                           <Download className="w-4 h-4 mr-2" />
                           Descarcă pachetul (63.5 KB)
                         </Button>
@@ -487,7 +492,15 @@ export default function ResultsPage() {
                         <p className="text-sm text-muted-foreground mb-4">
                           Numai fișierele de subtitrări în toate limbile
                         </p>
-                        <Button variant="outline" className="w-full border-border bg-transparent">
+                        <Button variant="outline" className="w-full border-border bg-transparent" onClick={async () => {
+                          if (!jobId) return
+                          const artifacts = await fetch(`/api/jobs/${jobId}/artifacts`).then(r => r.json())
+                          for (const a of artifacts) {
+                            if (a.type === "subtitle-srt" || a.type === "subtitle-vtt") {
+                              window.open(`/api/artifacts/${a.id}/download`, "_blank")
+                            }
+                          }
+                        }}>
                           <Download className="w-4 h-4 mr-2" />
                           Descarcă subtitrări (45.2 KB)
                         </Button>
@@ -509,11 +522,24 @@ export default function ResultsPage() {
                               </div>
                             </div>
                             <div className="space-y-2">
-                              <Button variant="outline" size="sm" className="w-full border-border bg-transparent">
+                              <Button variant="outline" size="sm" className="w-full border-border bg-transparent" onClick={async () => {
+                                const artifacts = await fetch(`/api/jobs/${jobId}/artifacts`).then(r => r.json())
+                                const srt = artifacts.find((a: any) => a.language === item.language && a.type === "subtitle-srt")
+                                if (srt) window.location.href = `/api/artifacts/${srt.id}/download`
+                              }}>
                                 <Download className="w-3 h-3 mr-2" />
                                 Subtitrări
                               </Button>
-                              <Button variant="outline" size="sm" className="w-full border-border bg-transparent">
+                              <Button variant="outline" size="sm" className="w-full border-border bg-transparent" onClick={() => {
+                                const text = `${item.title}\n\n${item.description}`
+                                const blob = new Blob([text], { type: "text/plain" })
+                                const url = URL.createObjectURL(blob)
+                                const a = document.createElement("a")
+                                a.href = url
+                                a.download = `${item.language}_title_description.txt`
+                                a.click()
+                                URL.revokeObjectURL(url)
+                              }}>
                                 <Download className="w-3 h-3 mr-2" />
                                 Titlu & Descriere
                               </Button>

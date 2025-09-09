@@ -3,6 +3,8 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -35,9 +37,12 @@ export default function ImportPage() {
   const [targetLanguages, setTargetLanguages] = useState<string[]>([])
   const [generateSubtitles, setGenerateSubtitles] = useState(true)
   const [generateTranslations, setGenerateTranslations] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const router = useRouter()
+  const { toast } = useToast()
 
   const validateYouTubeUrl = (url: string) => {
-    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+/
+    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|shorts\/|embed\/)|youtu\.be\/)[\w-]+/i
     return youtubeRegex.test(url)
   }
 
@@ -96,6 +101,41 @@ export default function ImportPage() {
   }
 
   const canProcess = (youtubeUrl && isValidUrl) || selectedFile
+
+  const handleProcess = async () => {
+    if (!canProcess || isSubmitting) return
+    setIsSubmitting(true)
+    try {
+      // For now, if file is selected we only send filename metadata.
+      // Actual file upload endpoint can be added later if needed.
+      const payload: any = {
+        youtubeUrl: isValidUrl ? youtubeUrl : undefined,
+        filename: selectedFile?.name,
+        title: selectedFile?.name || youtubeUrl,
+        sourceLanguage,
+        targetLanguages,
+        generateSubtitles,
+        generateTranslations,
+      }
+      const res = await fetch("/api/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error("Import failed")
+      const data = await res.json()
+      const jobId = data.jobId as string
+      router.push(`/processing?jobId=${encodeURIComponent(jobId)}`)
+    } catch (e: any) {
+      console.error(e)
+      toast({
+        title: "Eroare la pornirea procesării",
+        description: e?.message || "Încearcă din nou sau verifică link-ul YouTube.",
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -350,11 +390,12 @@ export default function ImportPage() {
           <div className="text-center">
             <Button
               size="lg"
-              disabled={!canProcess}
+              disabled={!canProcess || isSubmitting}
               className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white px-12 py-3 text-lg"
+              onClick={handleProcess}
             >
               <Play className="w-5 h-5 mr-2" />
-              Procesează videoclipul
+              {isSubmitting ? "Se pornește..." : "Procesează videoclipul"}
             </Button>
             {!canProcess && (
               <p className="text-sm text-muted-foreground mt-2">

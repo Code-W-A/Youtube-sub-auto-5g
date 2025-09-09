@@ -1,3 +1,5 @@
+"use client"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -5,8 +7,84 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Upload, Youtube, FileVideo, Download, Play } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
+import { cn } from "@/lib/utils"
+
+const SUPPORTED_LANGUAGES = [
+  { code: "en", name: "English" },
+  { code: "fr", name: "Français" },
+  { code: "es", name: "Español" },
+  { code: "de", name: "Deutsch" },
+  { code: "it", name: "Italiano" },
+  { code: "pt", name: "Português" },
+  { code: "ru", name: "Русский" },
+  { code: "ja", name: "日本語" },
+]
 
 export default function LocalizeStudio() {
+  const router = useRouter()
+  const { toast } = useToast()
+
+  const [youtubeUrl, setYoutubeUrl] = useState("")
+  const [isValidUrl, setIsValidUrl] = useState<boolean | null>(null)
+  const [targetLanguages, setTargetLanguages] = useState<string[]>(["en", "fr"]) // default like UI
+  const [sourceLanguage] = useState("auto")
+  const [generateSubtitles] = useState(true)
+  const [generateTranslations] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const validateYouTubeUrl = (url: string) => {
+    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|shorts\/|embed\/)|youtu\.be\/)[\w-]+/i
+    return youtubeRegex.test(url)
+  }
+
+  const handleUrlChange = (value: string) => {
+    setYoutubeUrl(value)
+    if (value.trim()) {
+      setIsValidUrl(validateYouTubeUrl(value))
+    } else {
+      setIsValidUrl(null)
+    }
+  }
+
+  const toggleLanguage = (langCode: string) => {
+    setTargetLanguages((prev) =>
+      prev.includes(langCode) ? prev.filter((c) => c !== langCode) : [...prev, langCode],
+    )
+  }
+
+  const canProcess = youtubeUrl && isValidUrl && targetLanguages.length >= 0
+
+  const handleProcess = async () => {
+    if (!canProcess || isSubmitting) return
+    setIsSubmitting(true)
+    try {
+      const res = await fetch("/api/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          youtubeUrl,
+          title: youtubeUrl,
+          sourceLanguage,
+          targetLanguages,
+          generateSubtitles,
+          generateTranslations,
+        }),
+      })
+      if (!res.ok) throw new Error("Import failed")
+      const data = await res.json()
+      router.push(`/processing?jobId=${encodeURIComponent(data.jobId)}`)
+    } catch (e: any) {
+      toast({
+        title: "Eroare la pornirea procesării",
+        description: e?.message || "Încearcă din nou sau verifică link-ul.",
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <main className="max-w-7xl mx-auto px-4 py-6">
@@ -24,8 +102,14 @@ export default function LocalizeStudio() {
                     YouTube URL
                   </Label>
                   <div className="flex gap-2 mt-1">
-                    <Input id="youtube-url" placeholder="https://youtube.com/watch?v=..." className="flex-1" />
-                    <Button variant="outline" size="sm">
+                    <Input
+                      id="youtube-url"
+                      placeholder="https://youtube.com/watch?v=..."
+                      className="flex-1"
+                      value={youtubeUrl}
+                      onChange={(e) => handleUrlChange(e.target.value)}
+                    />
+                    <Button variant="outline" size="sm" disabled={!isValidUrl || isSubmitting} onClick={handleProcess}>
                       <Youtube className="w-4 h-4 mr-1" />
                       Import
                     </Button>
@@ -50,26 +134,22 @@ export default function LocalizeStudio() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {[
-                    { code: "EN", name: "English", selected: true },
-                    { code: "FR", name: "Français", selected: true },
-                    { code: "ES", name: "Español", selected: false },
-                    { code: "DE", name: "Deutsch", selected: false },
-                    { code: "IT", name: "Italiano", selected: false },
-                    { code: "PT", name: "Português", selected: false },
-                    { code: "RU", name: "Русский", selected: false },
-                    { code: "JA", name: "日本語", selected: false },
-                  ].map((lang) => (
-                    <div
-                      key={lang.code}
-                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                        lang.selected ? "border-primary bg-primary/10" : "border-border hover:border-muted-foreground"
-                      }`}
-                    >
-                      <div className="font-medium text-sm text-foreground">{lang.code}</div>
-                      <div className="text-xs text-muted-foreground">{lang.name}</div>
-                    </div>
-                  ))}
+                  {SUPPORTED_LANGUAGES.map((lang) => {
+                    const selected = targetLanguages.includes(lang.code)
+                    return (
+                      <div
+                        key={lang.code}
+                        onClick={() => toggleLanguage(lang.code)}
+                        className={cn(
+                          "p-3 border rounded-lg cursor-pointer transition-colors",
+                          selected ? "border-primary bg-primary/10" : "border-border hover:border-muted-foreground",
+                        )}
+                      >
+                        <div className="font-medium text-sm text-foreground">{lang.code.toUpperCase()}</div>
+                        <div className="text-xs text-muted-foreground">{lang.name}</div>
+                      </div>
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -109,9 +189,13 @@ export default function LocalizeStudio() {
                   </div>
                 </div>
 
-                <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Button
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                  disabled={!canProcess || isSubmitting}
+                  onClick={handleProcess}
+                >
                   <Play className="w-4 h-4 mr-2" />
-                  Începe procesarea
+                  {isSubmitting ? "Se pornește..." : "Începe procesarea"}
                 </Button>
               </CardContent>
             </Card>

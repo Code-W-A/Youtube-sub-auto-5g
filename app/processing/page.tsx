@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
@@ -43,121 +44,71 @@ interface QueueJob {
 }
 
 export default function ProcessingPage() {
+  const router = useRouter()
+  const params = useSearchParams()
+  const jobId = params.get("jobId")
+
   const [currentStep, setCurrentStep] = useState(0)
-  const [overallProgress, setOverallProgress] = useState(15)
+  const [overallProgress, setOverallProgress] = useState(0)
   const [isProcessing, setIsProcessing] = useState(true)
+  const [jobTitle, setJobTitle] = useState<string>("Procesare videoclip")
+  const [jobUrlInfo, setJobUrlInfo] = useState<string>("")
 
-  const [steps, setSteps] = useState<ProcessingStep[]>([
-    {
-      id: "speech-to-text",
-      title: "Speech-to-text RO",
-      description: "Extragerea audio și transcrierea în română",
-      icon: <Mic className="w-5 h-5" />,
-      status: "completed",
-      progress: 100,
-      estimatedTime: "2-3 min",
-    },
-    {
-      id: "diacritics",
-      title: "Corectare diacritice",
-      description: "Adăugarea diacriticelor corecte în textul românesc",
-      icon: <Type className="w-5 h-5" />,
-      status: "processing",
-      progress: 65,
-      estimatedTime: "1-2 min",
-    },
-    {
-      id: "subtitles",
-      title: "Generare subtitrări",
-      description: "Crearea fișierelor de subtitrări sincronizate",
-      icon: <FileText className="w-5 h-5" />,
-      status: "pending",
-      progress: 0,
-      estimatedTime: "1 min",
-    },
-    {
-      id: "translations",
-      title: "Traduceri",
-      description: "Traducerea în limbile selectate (EN, FR, ES, DE)",
-      icon: <Languages className="w-5 h-5" />,
-      status: "pending",
-      progress: 0,
-      estimatedTime: "3-4 min",
-    },
-    {
-      id: "package",
-      title: "Pachet complet",
-      description: "Generarea titlurilor, descrierilor și finalizarea",
-      icon: <Package className="w-5 h-5" />,
-      status: "pending",
-      progress: 0,
-      estimatedTime: "1 min",
-    },
-  ])
+  const [steps, setSteps] = useState<ProcessingStep[]>([])
 
-  const [queueJobs] = useState<QueueJob[]>([
-    {
-      id: "current",
-      title: "Tutorial Marketing Digital",
-      type: "youtube",
-      status: "processing",
-      progress: 65,
-      languages: ["EN", "FR", "ES", "DE"],
-      createdAt: "Acum 5 minute",
-    },
-    {
-      id: "queue-1",
-      title: "Prezentare Produs 2024.mp4",
-      type: "upload",
-      status: "waiting",
-      progress: 0,
-      languages: ["EN", "DE"],
-      createdAt: "Acum 2 minute",
-    },
-    {
-      id: "queue-2",
-      title: "Webinar Tehnologie",
-      type: "youtube",
-      status: "waiting",
-      progress: 0,
-      languages: ["EN"],
-      createdAt: "Acum 1 minut",
-    },
-  ])
+  const [queueJobs] = useState<QueueJob[]>([])
 
-  // Simulate processing progress
   useEffect(() => {
-    if (!isProcessing) return
+    if (!jobId) return
 
-    const interval = setInterval(() => {
-      setSteps((prevSteps) => {
-        const newSteps = [...prevSteps]
-        const processingStep = newSteps.find((step) => step.status === "processing")
-
-        if (processingStep) {
-          processingStep.progress = Math.min(processingStep.progress + Math.random() * 10, 100)
-
-          if (processingStep.progress >= 100) {
-            processingStep.status = "completed"
-            const currentIndex = newSteps.findIndex((step) => step.id === processingStep.id)
-
-            if (currentIndex < newSteps.length - 1) {
-              newSteps[currentIndex + 1].status = "processing"
-              setCurrentStep(currentIndex + 1)
-            } else {
-              setIsProcessing(false)
-            }
-          }
+    let raf: number | null = null
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`)
+        if (!res.ok) throw new Error("status fetch failed")
+        const data = await res.json()
+        setJobTitle(data.title || "Procesare videoclip")
+        if (data.source?.kind === "youtube" && data.source?.url) {
+          setJobUrlInfo(`${data.source.url}`)
+        } else if (data.source?.filename) {
+          setJobUrlInfo(`${data.source.filename}`)
+        } else {
+          setJobUrlInfo("")
         }
-
-        return newSteps
-      })
-
-      setOverallProgress((prev) => Math.min(prev + Math.random() * 2, 95))
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [isProcessing])
+        const mappedSteps: ProcessingStep[] = (data.steps || []).map((s: any) => ({
+          id: s.id,
+          title: s.title,
+          description: s.description,
+          icon: s.id === "speech-to-text" ? <Mic className="w-5 h-5" /> :
+                s.id === "diacritics" ? <Type className="w-5 h-5" /> :
+                s.id === "subtitles" ? <FileText className="w-5 h-5" /> :
+                s.id === "translations" ? <Languages className="w-5 h-5" /> :
+                <Package className="w-5 h-5" />,
+          status: s.status,
+          progress: s.progress,
+          estimatedTime: s.estimatedTime,
+        }))
+        setSteps(mappedSteps)
+        const processingIndex = mappedSteps.findIndex((s) => s.status === "processing")
+        setCurrentStep(processingIndex >= 0 ? processingIndex : mappedSteps.length - 1)
+        setOverallProgress(Math.round(data.progress || 0))
+        const status = data.status as "waiting" | "processing" | "completed" | "error"
+        setIsProcessing(status === "processing" || status === "waiting")
+        if (status === "completed") {
+          router.push(`/results?jobId=${encodeURIComponent(jobId)}`)
+          return
+        }
+      } catch (e) {
+        // keep polling
+      } finally {
+        raf = window.setTimeout(poll, 1200) as unknown as number
+      }
+    }
+    poll()
+    return () => {
+      if (raf) window.clearTimeout(raf)
+    }
+  }, [jobId, router])
 
   const completedSteps = steps.filter((step) => step.status === "completed").length
   const totalSteps = steps.length
@@ -202,10 +153,8 @@ export default function ProcessingPage() {
                       <Youtube className="w-5 h-5 text-red-400" />
                     </div>
                     <div>
-                      <CardTitle className="text-foreground text-lg">Tutorial Marketing Digital</CardTitle>
-                      <CardDescription className="text-muted-foreground">
-                        youtube.com/watch?v=abc123 • 12:34 min
-                      </CardDescription>
+                      <CardTitle className="text-foreground text-lg">{jobTitle}</CardTitle>
+                      <CardDescription className="text-muted-foreground">{jobUrlInfo}</CardDescription>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -230,7 +179,7 @@ export default function ProcessingPage() {
                     <span>
                       Pasul {completedSteps + 1} din {totalSteps}
                     </span>
-                    <span>Timp estimat rămas: ~{isProcessing ? "4-6 min" : "Finalizat"}</span>
+                    <span>{isProcessing ? "În desfășurare" : "Finalizat"}</span>
                   </div>
                 </div>
               </CardContent>
