@@ -191,7 +191,7 @@ function generateSrtSample(text: string): string {
 
 function simulateProcessing(job: Job) {
   const interval = setInterval(() => {
-    const current = jobs.get(job.id)
+    const current = getStore().jobs.get(job.id)
     if (!current) return
 
     // Advance the currently processing step
@@ -205,7 +205,7 @@ function simulateProcessing(job: Job) {
       if (next >= 100) {
         // Mark step completed and start next
         setStepStatus(current, processing.id, "completed")
-        const steps = jobs.get(current.id)?.steps ?? []
+        const steps = getStore().jobs.get(current.id)?.steps ?? []
         const idx = steps.findIndex((s) => s.id === processing.id)
         if (idx >= 0 && idx < steps.length - 1) {
           const nextSteps = steps.map((s, i) => (i === idx + 1 ? { ...s, status: "processing" } : s))
