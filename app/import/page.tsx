@@ -33,6 +33,7 @@ export default function ImportPage() {
   const [isValidUrl, setIsValidUrl] = useState<boolean | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [selectedSrt, setSelectedSrt] = useState<File | null>(null)
   const [sourceLanguage, setSourceLanguage] = useState("auto")
   const [targetLanguages, setTargetLanguages] = useState<string[]>([])
   const [generateSubtitles, setGenerateSubtitles] = useState(true)
@@ -87,6 +88,13 @@ export default function ImportPage() {
     }
   }
 
+  const handleSrtSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && file.name.toLowerCase().endsWith(".srt")) {
+      setSelectedSrt(file)
+    }
+  }
+
   const toggleLanguage = (langCode: string) => {
     setTargetLanguages((prev) =>
       prev.includes(langCode) ? prev.filter((code) => code !== langCode) : [...prev, langCode],
@@ -118,6 +126,10 @@ export default function ImportPage() {
         generateSubtitles,
         generateTranslations,
         forceStt,
+      }
+      if (selectedSrt) {
+        const txt = await selectedSrt.text()
+        payload.srtContent = txt
       }
       const res = await fetch("/api/import", {
         method: "POST",
@@ -279,6 +291,37 @@ export default function ImportPage() {
                     </div>
                   </div>
                 )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* SRT Upload */}
+          <Card className="border-border shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center text-foreground">
+                <FileText className="w-5 h-5 mr-2" />
+                Încarcă subtitrare (.srt)
+              </CardTitle>
+              <CardDescription>Dacă încarci un SRT, îl folosim ca sursă pentru traduceri</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label className="text-foreground">Fișier .srt</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Vom păstra timpii și vom traduce în limbile selectate
+                  </p>
+                </div>
+                <div>
+                  <input type="file" accept=".srt" onChange={handleSrtSelect} className="hidden" id="srt-upload" />
+                  <Button variant="outline" asChild className="bg-transparent mr-2">
+                    <label htmlFor="srt-upload" className="cursor-pointer">
+                      <Upload className="w-4 h-4 mr-2" />
+                      Selectează .srt
+                    </label>
+                  </Button>
+                  {selectedSrt && <Badge variant="secondary">{selectedSrt.name}</Badge>}
+                </div>
               </div>
             </CardContent>
           </Card>

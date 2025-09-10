@@ -40,9 +40,10 @@ export interface Job {
   completedAt?: number
   steps: ProcessingStepState[]
   errorMessage?: string
-  transcriptSource?: "captions" | "stt" | "sample"
+  transcriptSource?: "captions" | "stt" | "sample" | "uploaded"
   captionsTrack?: { languageCode?: string; name?: string; kind?: string }
   forceStt?: boolean
+  uploadedSrt?: string
 }
 
 // In-memory stores (dev-only). Persist on global to survive hot-reloads and route isolates.
@@ -92,6 +93,7 @@ export interface CreateJobInput {
   generateSubtitles: boolean
   generateTranslations: boolean
   forceStt?: boolean
+  uploadedSrt?: string
 }
 
 export function createJob(input: CreateJobInput): Job {
@@ -150,6 +152,7 @@ export function createJob(input: CreateJobInput): Job {
     generateSubtitles: input.generateSubtitles,
     generateTranslations: input.generateTranslations,
     forceStt: input.forceStt ?? false,
+    uploadedSrt: input.uploadedSrt,
     createdAt: Date.now(),
     steps,
   }
@@ -161,7 +164,9 @@ export function createJob(input: CreateJobInput): Job {
   // Fire-and-forget: early probe of transcript source so UI can display it during processing
   ;(async () => {
     try {
-      if (job.forceStt) {
+      if (job.uploadedSrt && job.uploadedSrt.trim().length > 0) {
+        updateJob(job.id, { transcriptSource: "uploaded", captionsTrack: undefined })
+      } else if (job.forceStt) {
         updateJob(job.id, { transcriptSource: "stt", captionsTrack: undefined })
       } else if (job.source.kind === "youtube" && job.source.url) {
         const caps = await fetchPreferredCaptions(job.source.url, [job.sourceLanguage === "auto" ? "ro" : job.sourceLanguage, "ro", "en"]) 
@@ -268,7 +273,10 @@ async function finalizeJob(job: Job) {
   let roSrt = ""
   let selectedTrack: any = null
   try {
-    if (job.forceStt && job.source.kind === "youtube" && job.source.url) {
+    if (job.uploadedSrt && job.uploadedSrt.trim().length > 0) {
+      roSrt = job.uploadedSrt
+      updateJob(job.id, { transcriptSource: "uploaded", captionsTrack: undefined })
+    } else if (job.forceStt && job.source.kind === "youtube" && job.source.url) {
       const segments = await transcribeFromYoutubeUrl(job.source.url)
       roSrt = segmentsToSrt(segments, (t) => t)
       updateJob(job.id, { transcriptSource: "stt", captionsTrack: undefined })
