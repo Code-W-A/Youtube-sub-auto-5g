@@ -41,6 +41,9 @@ export default function ResultsPage() {
   const [transcriptInfo, setTranscriptInfo] = useState<string>("")
   const [subtitleFiles, setSubtitleFiles] = useState<SubtitleFile[]>([])
   const [titlesDescriptions, setTitlesDescriptions] = useState<TitleDescription[]>([])
+  const [hasJob, setHasJob] = useState<boolean>(false)
+  const [artifactList, setArtifactList] = useState<any[]>([])
+  const [processingTime, setProcessingTime] = useState<string>("—")
 
   const languageMeta: Record<string, { name: string; flag: string }> = useMemo(
     () => ({
@@ -66,6 +69,15 @@ export default function ResultsPage() {
       if (jobRes.ok) {
         const job = await jobRes.json()
         setProjectTitle(job.title || "Rezultate procesare")
+        if (job.createdAt && job.completedAt) {
+          const ms = Math.max(0, Number(job.completedAt) - Number(job.createdAt))
+          const sec = Math.floor(ms / 1000)
+          const m = Math.floor(sec / 60)
+          const s = sec % 60
+          setProcessingTime(m > 0 ? `${m} min ${s}s` : `${s}s`)
+        } else {
+          setProcessingTime("—")
+        }
         const src: string | undefined = job.transcriptSource
         let info = ""
         if (src === "captions") {
@@ -76,14 +88,18 @@ export default function ResultsPage() {
           info = "Sursă transcript: STT (fallback)"
         } else if (src === "sample") {
           info = "Sursă transcript: Eșantion (demo)"
+        } else if (src === "uploaded") {
+          info = "Sursă transcript: SRT încărcat"
         } else {
           info = "Sursă transcript: Necunoscut"
         }
         setTranscriptInfo(info)
+        setHasJob(true)
       }
       const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/artifacts`)
       if (!res.ok) return
       const list = await res.json()
+      setArtifactList(list as any[])
       const subs: SubtitleFile[] = []
       const titles: TitleDescription[] = []
       for (const a of list as any[]) {
@@ -171,7 +187,10 @@ export default function ResultsPage() {
                 Procesare completă
               </Badge>
               <Button className="bg-primary hover:bg-primary/90 text-white" onClick={() => {
-                if (!jobId) return
+                if (!jobId) {
+                  toast({ title: "Lipsește jobId", description: "Deschide rezultatele din pagina de procesare.", variant: "destructive" })
+                  return
+                }
                 window.location.href = `/api/jobs/${jobId}/package`
               }}>
                 <Package className="w-4 h-4 mr-2" />
@@ -187,7 +206,7 @@ export default function ResultsPage() {
                   <FileText className="w-5 h-5 text-muted-foreground" />
                   <div>
                     <p className="text-sm text-muted-foreground">Subtitrări</p>
-                    <p className="text-lg font-medium text-foreground">5 limbi</p>
+                    <p className="text-lg font-medium text-foreground">{subtitleFiles.length} fișiere</p>
                   </div>
                 </div>
               </CardContent>
@@ -198,7 +217,7 @@ export default function ResultsPage() {
                   <Youtube className="w-5 h-5 text-red-400" />
                   <div>
                     <p className="text-sm text-muted-foreground">Titluri & Descrieri</p>
-                    <p className="text-lg font-medium text-foreground">5 limbi</p>
+                    <p className="text-lg font-medium text-foreground">{titlesDescriptions.length} limbi</p>
                   </div>
                 </div>
               </CardContent>
@@ -209,7 +228,12 @@ export default function ResultsPage() {
                   <Package className="w-5 h-5 text-muted-foreground" />
                   <div>
                     <p className="text-sm text-muted-foreground">Dimensiune totală</p>
-                    <p className="text-lg font-medium text-foreground">63.5 KB</p>
+                    <p className="text-lg font-medium text-foreground">{
+                      (() => {
+                        const total = artifactList.reduce((acc, a: any) => acc + (a.sizeBytes || 0), 0)
+                        return `${Math.max(1, Math.round(total / 1024))} KB`
+                      })()
+                    }</p>
                   </div>
                 </div>
               </CardContent>
@@ -220,7 +244,7 @@ export default function ResultsPage() {
                   <CheckCircle className="w-5 h-5 text-green-400" />
                   <div>
                     <p className="text-sm text-muted-foreground">Timp procesare</p>
-                    <p className="text-lg font-medium text-foreground">8 min 32s</p>
+                    <p className="text-lg font-medium text-foreground">{processingTime}</p>
                   </div>
                 </div>
               </CardContent>
@@ -265,31 +289,46 @@ export default function ResultsPage() {
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Button variant="outline" size="sm" className="border-border bg-transparent" onClick={async () => {
+                        <Button variant="outline" size="sm" className="border-border bg-transparent" disabled={!hasJob} onClick={async () => {
+                          if (!hasJob || !jobId) {
+                            toast({ title: "Lipsește jobId", description: "Deschide rezultatele din pagina de procesare.", variant: "destructive" })
+                            return
+                          }
                           try {
-                            const artifacts = await fetch(`/api/jobs/${jobId}/artifacts`).then(r => r.json())
-                            const srt = artifacts.find((a: any) => a.language === file.language && a.type === "subtitle-srt")
+                            const srt = artifactList.find((a: any) => a.language === file.language && a.type === "subtitle-srt")
                             if (srt) {
                               const txt = await fetch(`/api/artifacts/${srt.id}/download`).then(r => r.text())
                               toast({ title: "Preview", description: txt.slice(0, 200) + (txt.length > 200 ? "..." : "") })
+                            } else {
+                              toast({ title: "Subtitrare lipsă", description: "Nu am găsit fișierul .srt pentru această limbă.", variant: "destructive" })
                             }
-                          } catch {}
+                          } catch (e) {
+                            toast({ title: "Eroare la preview", description: "Încercare eșuată.", variant: "destructive" })
+                          }
                         }}>
                           <Eye className="w-4 h-4 mr-2" />
                           Preview
                         </Button>
-                        <Button variant="outline" size="sm" className="border-border bg-transparent" onClick={async () => {
-                          const artifacts = await fetch(`/api/jobs/${jobId}/artifacts`).then(r => r.json())
-                          const srt = artifacts.find((a: any) => a.language === file.language && a.type === "subtitle-srt")
+                        <Button variant="outline" size="sm" className="border-border bg-transparent" disabled={!hasJob} onClick={async () => {
+                          if (!hasJob || !jobId) {
+                            toast({ title: "Lipsește jobId", description: "Deschide rezultatele din pagina de procesare.", variant: "destructive" })
+                            return
+                          }
+                          const srt = artifactList.find((a: any) => a.language === file.language && a.type === "subtitle-srt")
                           if (srt) window.location.href = `/api/artifacts/${srt.id}/download`
+                          else toast({ title: "Subtitrare lipsă", description: "Nu am găsit fișierul .srt pentru această limbă.", variant: "destructive" })
                         }}>
                           <Download className="w-4 h-4 mr-2" />
                           .srt
                         </Button>
-                        <Button variant="outline" size="sm" className="border-border bg-transparent" onClick={async () => {
-                          const artifacts = await fetch(`/api/jobs/${jobId}/artifacts`).then(r => r.json())
-                          const vtt = artifacts.find((a: any) => a.language === file.language && a.type === "subtitle-vtt")
+                        <Button variant="outline" size="sm" className="border-border bg-transparent" disabled={!hasJob} onClick={async () => {
+                          if (!hasJob || !jobId) {
+                            toast({ title: "Lipsește jobId", description: "Deschide rezultatele din pagina de procesare.", variant: "destructive" })
+                            return
+                          }
+                          const vtt = artifactList.find((a: any) => a.language === file.language && a.type === "subtitle-vtt")
                           if (vtt) window.location.href = `/api/artifacts/${vtt.id}/download`
+                          else toast({ title: "Subtitrare lipsă", description: "Nu am găsit fișierul .vtt pentru această limbă.", variant: "destructive" })
                         }}>
                           <Download className="w-4 h-4 mr-2" />
                           .vtt
@@ -299,9 +338,12 @@ export default function ResultsPage() {
                   ))}
                 </div>
                 <div className="mt-6 text-center">
-                  <Button className="bg-primary hover:bg-primary/90 text-white" onClick={async () => {
-                    const artifacts = await fetch(`/api/jobs/${jobId}/artifacts`).then(r => r.json())
-                    for (const a of artifacts) {
+                  <Button className="bg-primary hover:bg-primary/90 text-white" disabled={!hasJob} onClick={async () => {
+                    if (!hasJob || !jobId) {
+                      toast({ title: "Lipsește jobId", description: "Deschide rezultatele din pagina de procesare.", variant: "destructive" })
+                      return
+                    }
+                    for (const a of artifactList) {
                       if (a.type === "subtitle-srt" || a.type === "subtitle-vtt") {
                         window.open(`/api/artifacts/${a.id}/download`, "_blank")
                       }

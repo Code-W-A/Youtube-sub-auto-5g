@@ -5,11 +5,11 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 
 const navigation = [
-  { name: "Import Video", href: "/" },
+  { name: "Import SRT", href: "/" },
   { name: "Procesare", href: "/processing" },
   { name: "Rezultate", href: "/results" },
-  { name: "Istoric", href: "/history" },
-  { name: "Setări", href: "/settings" },
+  // { name: "Istoric", href: "/history" },
+  // { name: "Setări", href: "/settings" },
 ]
 
 export function Navbar() {

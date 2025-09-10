@@ -101,8 +101,8 @@ export function createJob(input: CreateJobInput): Job {
   const steps: ProcessingStepState[] = [
     {
       id: "speech-to-text",
-      title: "Speech-to-text RO",
-      description: "Extragerea audio și transcrierea în română",
+      title: "Procesare SRT",
+      description: "Procesarea fișierului SRT",
       status: "processing",
       progress: 0,
       estimatedTime: "2-3 min",

@@ -129,6 +129,7 @@ export default function ProcessingPage() {
 
   const completedSteps = steps.filter((step) => step.status === "completed").length
   const totalSteps = steps.length
+  const displayedStep = Math.min(completedSteps + 1, Math.max(1, totalSteps))
 
   const getStepStatusColor = (status: ProcessingStep["status"]) => {
     switch (status) {
@@ -197,7 +198,7 @@ export default function ProcessingPage() {
                   </div>
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
                     <span>
-                      Pasul {completedSteps + 1} din {totalSteps}
+                      Pasul {displayedStep} din {totalSteps}
                     </span>
                     <span>{isProcessing ? "În desfășurare" : "Finalizat"}</span>
                   </div>
@@ -255,138 +256,10 @@ export default function ProcessingPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border">
-              <CardHeader>
-                <CardTitle className="text-foreground text-lg">Limbi în procesare</CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  Status traducerilor pentru acest proiect
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {[
-                    { code: "RO", name: "Română", flag: "🇷🇴", status: "completed" },
-                    { code: "EN", name: "English", flag: "🇺🇸", status: "processing" },
-                    { code: "FR", name: "Français", flag: "🇫🇷", status: "pending" },
-                    { code: "ES", name: "Español", flag: "🇪🇸", status: "pending" },
-                    { code: "DE", name: "Deutsch", flag: "🇩🇪", status: "pending" },
-                  ].map((lang) => (
-                    <div
-                      key={lang.code}
-                      className={cn(
-                        "flex items-center space-x-2 p-2 rounded border text-sm",
-                        lang.status === "completed" && "border-green-500/30 bg-green-500/10",
-                        lang.status === "processing" && "border-primary/30 bg-primary/10",
-                        lang.status === "pending" && "border-border bg-card",
-                      )}
-                    >
-                      <span className="text-base">{lang.flag}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground">{lang.code}</p>
-                        <p className="text-xs text-muted-foreground">{lang.name}</p>
-                      </div>
-                      {lang.status === "completed" && <CheckCircle className="w-4 h-4 text-green-400" />}
-                      {lang.status === "processing" && (
-                        <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            {/* Removed dummy languages card to keep only real data */}
           </div>
 
-          <div className="space-y-6">
-            <Card className="border-border">
-              <CardHeader>
-                <CardTitle className="text-foreground text-lg">Coadă procesare</CardTitle>
-                <CardDescription className="text-muted-foreground">Job-uri în așteptare</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {queueJobs.map((job, index) => (
-                  <div
-                    key={job.id}
-                    className={cn(
-                      "p-3 rounded border",
-                      job.status === "processing" ? "border-primary/30 bg-primary/10" : "border-border bg-card",
-                    )}
-                  >
-                    <div className="flex items-center space-x-2 mb-2">
-                      <div
-                        className={cn(
-                          "w-6 h-6 rounded flex items-center justify-center",
-                          job.type === "youtube" ? "bg-red-500/20" : "bg-muted",
-                        )}
-                      >
-                        {job.type === "youtube" ? (
-                          <Youtube className="w-3 h-3 text-red-400" />
-                        ) : (
-                          <Play className="w-3 h-3 text-muted-foreground" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-medium text-foreground truncate">{job.title}</h4>
-                        <p className="text-xs text-muted-foreground">{job.createdAt}</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Badge
-                          className={cn(
-                            "text-xs",
-                            job.status === "processing" && "bg-primary/20 text-primary",
-                            job.status === "waiting" && "bg-muted text-muted-foreground",
-                          )}
-                        >
-                          {job.status === "processing" ? "În procesare" : "În așteptare"}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {job.status === "processing" ? `${job.progress}%` : `Poziția ${index}`}
-                        </span>
-                      </div>
-
-                      {job.status === "processing" && <Progress value={job.progress} className="h-1" />}
-
-                      <div className="flex flex-wrap gap-1">
-                        {job.languages.map((lang) => (
-                          <Badge key={lang} variant="outline" className="text-xs border-border text-muted-foreground">
-                            {lang}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card className="border-border">
-              <CardHeader>
-                <CardTitle className="text-foreground text-lg">Status sistem</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Servere procesare</span>
-                  <div className="flex items-center space-x-1">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-foreground">Operațional</span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">API traduceri</span>
-                  <div className="flex items-center space-x-1">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-foreground">Operațional</span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Timp răspuns mediu</span>
-                  <span className="text-foreground">1.2s</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Right column intentionally left empty to avoid dummy widgets */}
         </div>
       </main>
     </div>
