@@ -26,6 +26,7 @@ export default function LocalizeStudio() {
   const { toast } = useToast()
 
   const [selectedSrt, setSelectedSrt] = useState<File | null>(null)
+  const [selectedSbv, setSelectedSbv] = useState<File | null>(null)
   const [targetLanguages, setTargetLanguages] = useState<string[]>(["en", "fr"]) // default like UI
   const [sourceLanguage] = useState("auto")
   const [generateSubtitles] = useState(true)
@@ -36,6 +37,10 @@ export default function LocalizeStudio() {
     const f = e.target.files?.[0]
     if (f && f.name.toLowerCase().endsWith(".srt")) setSelectedSrt(f)
   }
+  const handleSbvSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (f && f.name.toLowerCase().endsWith(".sbv")) setSelectedSbv(f)
+  }
 
   const toggleLanguage = (langCode: string) => {
     setTargetLanguages((prev) =>
@@ -43,7 +48,7 @@ export default function LocalizeStudio() {
     )
   }
 
-  const canProcess = Boolean(selectedSrt && targetLanguages.length >= 0)
+  const canProcess = Boolean((selectedSrt || selectedSbv) && targetLanguages.length >= 0)
 
   const handleProcess = async () => {
     if (!canProcess || isSubmitting) return
@@ -51,7 +56,7 @@ export default function LocalizeStudio() {
     try {
       const payload: any = {
         filename: selectedSrt?.name,
-        title: selectedSrt?.name,
+        title: selectedSrt?.name || selectedSbv?.name,
         sourceLanguage,
         targetLanguages,
         generateSubtitles,
@@ -60,6 +65,9 @@ export default function LocalizeStudio() {
       if (selectedSrt) {
         const txt = await selectedSrt.text()
         payload.srtContent = txt
+      } else if (selectedSbv) {
+        const txt = await selectedSbv.text()
+        payload.sbvContent = txt
       }
       const res = await fetch("/api/import", {
         method: "POST",
@@ -100,6 +108,27 @@ export default function LocalizeStudio() {
                   </Button>
                   {selectedSrt && (
                     <div className="mt-2 text-xs text-muted-foreground">Selectat: {selectedSrt.name}</div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* SBV Import */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg text-foreground">1.1 Import SBV</CardTitle>
+                <CardDescription>Încarcă fișier .sbv (YouTube)</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-center py-4 border-2 border-dashed border-border rounded-lg">
+                  <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">sau drag & drop fișier .sbv aici</p>
+                  <input id="main-sbv-upload" type="file" accept=".sbv" className="hidden" onChange={handleSbvSelect} />
+                  <Button asChild variant="outline" size="sm" className="mt-2 bg-transparent">
+                    <label htmlFor="main-sbv-upload" className="cursor-pointer">Selectează fișier</label>
+                  </Button>
+                  {selectedSbv && (
+                    <div className="mt-2 text-xs text-muted-foreground">Selectat: {selectedSbv.name}</div>
                   )}
                 </div>
               </CardContent>

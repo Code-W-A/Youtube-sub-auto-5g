@@ -32,6 +32,7 @@ export default function ImportPage() {
   const [isDragOver, setIsDragOver] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [selectedSrt, setSelectedSrt] = useState<File | null>(null)
+  const [selectedSbv, setSelectedSbv] = useState<File | null>(null)
   const [sourceLanguage, setSourceLanguage] = useState("auto")
   const [targetLanguages, setTargetLanguages] = useState<string[]>([])
   const [generateSubtitles, setGenerateSubtitles] = useState(true)
@@ -77,6 +78,12 @@ export default function ImportPage() {
       setSelectedSrt(file)
     }
   }
+  const handleSbvSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && file.name.toLowerCase().endsWith(".sbv")) {
+      setSelectedSbv(file)
+    }
+  }
 
   const toggleLanguage = (langCode: string) => {
     setTargetLanguages((prev) =>
@@ -92,7 +99,7 @@ export default function ImportPage() {
     setTargetLanguages([])
   }
 
-  const canProcess = Boolean(selectedFile || selectedSrt)
+  const canProcess = Boolean(selectedFile || selectedSrt || selectedSbv)
 
   const handleProcess = async () => {
     if (!canProcess || isSubmitting) return
@@ -110,6 +117,9 @@ export default function ImportPage() {
       if (selectedSrt) {
         const txt = await selectedSrt.text()
         payload.srtContent = txt
+      } else if (selectedSbv) {
+        const txt = await selectedSbv.text()
+        payload.sbvContent = txt
       }
       const res = await fetch("/api/import", {
         method: "POST",
@@ -254,6 +264,35 @@ export default function ImportPage() {
                     </label>
                   </Button>
                   {selectedSrt && <Badge variant="secondary">{selectedSrt.name}</Badge>}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* SBV Upload */}
+          <Card className="border-border shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center text-foreground">
+                <FileText className="w-5 h-5 mr-2" />
+                Încarcă subtitrare (.sbv)
+              </CardTitle>
+              <CardDescription>Acceptăm formatul SBV (YouTube); îl convertim automat în SRT</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label className="text-foreground">Fișier .sbv</Label>
+                  <p className="text-sm text-muted-foreground">Conversie automată în SRT și traducere</p>
+                </div>
+                <div>
+                  <input type="file" accept=".sbv" onChange={handleSbvSelect} className="hidden" id="sbv-upload" />
+                  <Button variant="outline" asChild className="bg-transparent mr-2">
+                    <label htmlFor="sbv-upload" className="cursor-pointer">
+                      <Upload className="w-4 h-4 mr-2" />
+                      Selectează .sbv
+                    </label>
+                  </Button>
+                  {selectedSbv && <Badge variant="secondary">{selectedSbv.name}</Badge>}
                 </div>
               </div>
             </CardContent>

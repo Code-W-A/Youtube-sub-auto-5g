@@ -22,6 +22,7 @@ export async function POST(request: Request) {
         generateTranslations = true,
         forceStt = false,
         srtContent,
+        sbvContent,
       } = body ?? {}
 
       if (!youtubeUrl && !filename) {
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
         generateSubtitles,
         generateTranslations,
         forceStt,
-        uploadedSrt: typeof srtContent === "string" ? srtContent : undefined,
+        uploadedSrt: typeof srtContent === "string" ? srtContent : (typeof sbvContent === "string" ? require("@/lib/utils").sbvToSrt(sbvContent) : undefined),
       })
 
       return NextResponse.json({ jobId: job.id }, { status: 201 })
