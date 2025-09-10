@@ -178,13 +178,13 @@ export default function ProcessingPage() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  {/* <div className="flex items-center space-x-2">
                     <Badge className="bg-primary/20 text-primary border-primary/30">În procesare</Badge>
                     <Button variant="outline" size="sm">
                       <Pause className="w-4 h-4 mr-1" />
                       Pauză
                     </Button>
-                  </div>
+                  </div> */}
                 </div>
               </CardHeader>
               <CardContent>

@@ -101,8 +101,8 @@ export function createJob(input: CreateJobInput): Job {
   const steps: ProcessingStepState[] = [
     {
       id: "speech-to-text",
-      title: "Procesare SRT",
-      description: "Procesarea fișierului SRT",
+      title: "Procesare fisier",
+      description: "Procesarea fișierului SRT sau SBV",
       status: "processing",
       progress: 0,
       estimatedTime: "2-3 min",
@@ -239,18 +239,20 @@ function simulateProcessing(job: Job) {
       const increment = Math.random() * 15 + 5
       const next = Math.min(processing.progress + increment, 100)
       setStepProgress(current, processing.id, next)
-      const overall = Math.min((current.progress ?? 0) + increment * 0.2, 98)
+      const overall = Math.min((current.progress ?? 0) + increment * 0.2, 99)
       updateJob(current.id, { progress: overall })
       if (next >= 100) {
-        // Mark step completed and start next
-        setStepStatus(current, processing.id, "completed")
+        // Determine if this is the last step
         const steps = (getStore().jobs.get(current.id)?.steps ?? []) as ProcessingStepState[]
         const idx = steps.findIndex((s) => s.id === processing.id)
         if (idx >= 0 && idx < steps.length - 1) {
+          // Mark step completed and start next
+          setStepStatus(current, processing.id, "completed")
           const nextSteps: ProcessingStepState[] = steps.map<ProcessingStepState>((s, i) => (i === idx + 1 ? { ...s, status: "processing" } : s))
           updateJob(current.id, { steps: nextSteps as ProcessingStepState[] })
         } else {
-          // Finalize job and create artifacts
+          // Keep last step as processing and run finalize; set progress near-complete
+          updateJob(current.id, { progress: 99 })
           finalizeJob(current)
           clearInterval(interval)
         }
