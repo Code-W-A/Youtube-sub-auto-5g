@@ -14,6 +14,7 @@ function getOpenAIClient(): OpenAI | null {
 export async function translateText(input: string, targetLanguageCode: string): Promise<string> {
   const client = getOpenAIClient()
   if (!client) {
+    console.log(`[translate] no OPENAI key, echoing text`, { targetLanguageCode, inputLen: input.length })
     return `[${targetLanguageCode.toUpperCase()}] ${input}`
   }
   try {
@@ -27,8 +28,10 @@ export async function translateText(input: string, targetLanguageCode: string): 
       temperature: 0.2,
     })
     const txt = res.choices?.[0]?.message?.content?.toString() ?? ""
+    console.log(`[translate] text translated`, { targetLanguageCode, outLen: txt.length })
     return txt.trim() || input
   } catch {
+    console.log(`[translate] error translating text, echo fallback`, { targetLanguageCode })
     return `[${targetLanguageCode.toUpperCase()}] ${input}`
   }
 }
@@ -40,6 +43,7 @@ export async function translateTitleAndDescription(
 ): Promise<{ title: string; description: string }> {
   const client = getOpenAIClient()
   if (!client) {
+    console.log(`[translate] no OPENAI key for titles/desc, echoing`, { targetLanguageCode })
     return {
       title: `${baseTitle} [${targetLanguageCode.toUpperCase()}]`,
       description: `[${targetLanguageCode.toUpperCase()}] ${baseDescription}`,
@@ -69,8 +73,10 @@ Description: <translated description>`
     const descMatch = txt.match(/Description:\s*([\s\S]+)/i)
     const title = (titleMatch?.[1] ?? baseTitle).trim()
     const description = (descMatch?.[1] ?? baseDescription).trim()
+    console.log(`[translate] titles/descriptions translated`, { targetLanguageCode, titleLen: title.length, descLen: description.length })
     return { title, description }
   } catch {
+    console.log(`[translate] error titles/desc, echo fallback`, { targetLanguageCode })
     return {
       title: `${baseTitle} [${targetLanguageCode.toUpperCase()}]`,
       description: `[${targetLanguageCode.toUpperCase()}] ${baseDescription}`,
@@ -83,6 +89,7 @@ export async function translateSrtPreserveTiming(srt: string, targetLanguageCode
   const client = getOpenAIClient()
   if (!client) {
     // Fallback: keep original text but tag language (still preserves link content)
+    console.log(`[translate] no OPENAI key for SRT, tagging only`, { targetLanguageCode, srtBytes: srt.length })
     const lines = srt.split("\n")
     const out: string[] = []
     for (const line of lines) {
@@ -106,8 +113,10 @@ export async function translateSrtPreserveTiming(srt: string, targetLanguageCode
       temperature: 0.1,
     })
     const txt = res.choices?.[0]?.message?.content?.toString() ?? ""
+    console.log(`[translate] SRT translated`, { targetLanguageCode, outBytes: txt.length })
     return txt.trim() || srt
   } catch {
+    console.log(`[translate] error translating SRT, passthrough`, { targetLanguageCode })
     return srt
   }
 }

@@ -7,12 +7,11 @@ import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Upload, Youtube, Globe, ArrowLeft, Check, X, Languages, FileVideo, Link, Play } from "lucide-react"
+import { Upload, Globe, ArrowLeft, Check, Languages, FileVideo, Play, FileText } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const SUPPORTED_LANGUAGES = [
@@ -29,8 +28,7 @@ const SUPPORTED_LANGUAGES = [
 ]
 
 export default function ImportPage() {
-  const [youtubeUrl, setYoutubeUrl] = useState("")
-  const [isValidUrl, setIsValidUrl] = useState<boolean | null>(null)
+  
   const [isDragOver, setIsDragOver] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [selectedSrt, setSelectedSrt] = useState<File | null>(null)
@@ -38,24 +36,9 @@ export default function ImportPage() {
   const [targetLanguages, setTargetLanguages] = useState<string[]>([])
   const [generateSubtitles, setGenerateSubtitles] = useState(true)
   const [generateTranslations, setGenerateTranslations] = useState(true)
-  const [forceStt, setForceStt] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
-
-  const validateYouTubeUrl = (url: string) => {
-    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|shorts\/|embed\/)|youtu\.be\/)[\w-]+/i
-    return youtubeRegex.test(url)
-  }
-
-  const handleUrlChange = (value: string) => {
-    setYoutubeUrl(value)
-    if (value.trim()) {
-      setIsValidUrl(validateYouTubeUrl(value))
-    } else {
-      setIsValidUrl(null)
-    }
-  }
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -109,23 +92,20 @@ export default function ImportPage() {
     setTargetLanguages([])
   }
 
-  const canProcess = (youtubeUrl && isValidUrl) || selectedFile
+  const canProcess = Boolean(selectedFile || selectedSrt)
 
   const handleProcess = async () => {
     if (!canProcess || isSubmitting) return
     setIsSubmitting(true)
     try {
-      // For now, if file is selected we only send filename metadata.
-      // Actual file upload endpoint can be added later if needed.
+      // For now, we only send metadata and optional SRT content.
       const payload: any = {
-        youtubeUrl: isValidUrl ? youtubeUrl : undefined,
         filename: selectedFile?.name,
-        title: selectedFile?.name || youtubeUrl,
+        title: selectedFile?.name || selectedSrt?.name || "Proiect",
         sourceLanguage,
         targetLanguages,
         generateSubtitles,
         generateTranslations,
-        forceStt,
       }
       if (selectedSrt) {
         const txt = await selectedSrt.text()
@@ -144,7 +124,7 @@ export default function ImportPage() {
       console.error(e)
       toast({
         title: "Eroare la pornirea procesării",
-        description: e?.message || "Încearcă din nou sau verifică link-ul YouTube.",
+        description: e?.message || "Încearcă din nou.",
         variant: "destructive",
       })
       setIsSubmitting(false)
@@ -173,56 +153,11 @@ export default function ImportPage() {
 
       <main className="container mx-auto px-6 py-8 max-w-4xl">
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-foreground mb-2 text-balance">Import video</h2>
-          <p className="text-lg text-muted-foreground text-pretty">
-            Adaugă un link YouTube sau încarcă un fișier video pentru a începe procesarea
-          </p>
+          <h2 className="text-3xl font-bold text-foreground mb-2 text-balance">Import</h2>
+          <p className="text-lg text-muted-foreground text-pretty">Încarcă un fișier video și/sau un fișier .srt</p>
         </div>
 
         <div className="space-y-8">
-          {/* YouTube URL Input */}
-          <Card className="border-border shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center text-foreground">
-                <Youtube className="w-5 h-5 mr-2 text-red-500" />
-                Link YouTube
-              </CardTitle>
-              <CardDescription>Lipește URL-ul videoclipului YouTube pe care vrei să-l procesezi</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex space-x-3">
-                <div className="flex-1 relative">
-                  <Input
-                    placeholder="https://www.youtube.com/watch?v=..."
-                    value={youtubeUrl}
-                    onChange={(e) => handleUrlChange(e.target.value)}
-                    className={cn(
-                      "pr-10",
-                      isValidUrl === true && "border-green-500",
-                      isValidUrl === false && "border-red-500",
-                    )}
-                  />
-                  {isValidUrl !== null && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      {isValidUrl ? (
-                        <Check className="w-4 h-4 text-green-500" />
-                      ) : (
-                        <X className="w-4 h-4 text-red-500" />
-                      )}
-                    </div>
-                  )}
-                </div>
-                <Button variant="outline" disabled={!isValidUrl} className="bg-transparent">
-                  <Link className="w-4 h-4 mr-2" />
-                  Verifică
-                </Button>
-              </div>
-              {isValidUrl === false && (
-                <p className="text-sm text-red-500">URL YouTube invalid. Te rog verifică linkul.</p>
-              )}
-            </CardContent>
-          </Card>
-
           {/* File Upload */}
           <Card className="border-border shadow-sm">
             <CardHeader>
@@ -269,9 +204,7 @@ export default function ImportPage() {
                       <Upload className="w-8 h-8 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="text-lg font-medium text-foreground">
-                        Trage un fișier aici sau lipește un link YouTube
-                      </p>
+                      <p className="text-lg font-medium text-foreground">Trage un fișier aici</p>
                       <p className="text-muted-foreground">Selectează un videoclip pentru a începe procesarea</p>
                     </div>
                     <div>
@@ -428,13 +361,6 @@ export default function ImportPage() {
                 </div>
                 <Switch checked={generateTranslations} onCheckedChange={setGenerateTranslations} />
               </div>
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label className="text-foreground">Forțează STT (Whisper)</Label>
-                  <p className="text-sm text-muted-foreground">Ignoră captions YouTube și transcrie direct din audio</p>
-                </div>
-                <Switch checked={forceStt} onCheckedChange={setForceStt} />
-              </div>
             </CardContent>
           </Card>
 
@@ -447,12 +373,10 @@ export default function ImportPage() {
               onClick={handleProcess}
             >
               <Play className="w-5 h-5 mr-2" />
-              {isSubmitting ? "Se pornește..." : "Procesează videoclipul"}
+              {isSubmitting ? "Se pornește..." : "Procesează"}
             </Button>
             {!canProcess && (
-              <p className="text-sm text-muted-foreground mt-2">
-                Adaugă un link YouTube valid sau încarcă un fișier video pentru a continua
-              </p>
+              <p className="text-sm text-muted-foreground mt-2">Încarcă un fișier video sau un fișier .srt pentru a continua</p>
             )}
           </div>
         </div>

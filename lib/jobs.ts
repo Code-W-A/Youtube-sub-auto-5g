@@ -260,6 +260,7 @@ function simulateProcessing(job: Job) {
 }
 
 async function finalizeJob(job: Job) {
+  console.log(`[jobs] finalize start`, { jobId: job.id })
   let baseTitle = job.title || (job.source.kind === "youtube" ? (job.source.url ?? "YouTube video") : (job.source.filename ?? "Video"))
   let baseDescription: string | undefined
   if (job.source.kind === "youtube" && job.source.url) {
@@ -275,10 +276,12 @@ async function finalizeJob(job: Job) {
   try {
     if (job.uploadedSrt && job.uploadedSrt.trim().length > 0) {
       roSrt = job.uploadedSrt
+      console.log(`[jobs] using uploaded SRT`, { jobId: job.id, srtBytes: roSrt.length })
       updateJob(job.id, { transcriptSource: "uploaded", captionsTrack: undefined })
     } else if (job.forceStt && job.source.kind === "youtube" && job.source.url) {
       const segments = await transcribeFromYoutubeUrl(job.source.url)
       roSrt = segmentsToSrt(segments, (t) => t)
+      console.log(`[jobs] used STT (forced)`, { jobId: job.id, segments: segments.length, srtBytes: roSrt.length })
       updateJob(job.id, { transcriptSource: "stt", captionsTrack: undefined })
     } else if (job.source.kind === "youtube" && job.source.url) {
       // 1) Try to fetch existing captions (prefer RO, then EN)
@@ -286,6 +289,7 @@ async function finalizeJob(job: Job) {
       if (caps?.srt) {
         roSrt = caps.srt
         selectedTrack = caps.track
+        console.log(`[jobs] using YouTube captions`, { jobId: job.id, languageCode: (caps.track as any)?.languageCode, srtBytes: roSrt.length })
         updateJob(job.id, {
           transcriptSource: "captions",
           captionsTrack: {
@@ -298,17 +302,21 @@ async function finalizeJob(job: Job) {
         // 2) Fallback: STT
         const segments = await transcribeFromYoutubeUrl(job.source.url)
         roSrt = segmentsToSrt(segments, (t) => t)
+        console.log(`[jobs] used STT (fallback)`, { jobId: job.id, segments: segments.length, srtBytes: roSrt.length })
         updateJob(job.id, { transcriptSource: "stt", captionsTrack: undefined })
       }
     } else {
       roSrt = generateSrtSample("Bună ziua și bun venit la acest tutorial...")
+      console.log(`[jobs] used sample SRT`, { jobId: job.id })
       updateJob(job.id, { transcriptSource: "sample", captionsTrack: undefined })
     }
   } catch {
     roSrt = generateSrtSample("Bună ziua și bun venit la acest tutorial...")
+    console.log(`[jobs] error preparing RO SRT, falling back to sample`, { jobId: job.id })
     updateJob(job.id, { transcriptSource: "sample", captionsTrack: undefined })
   }
   const roVtt = srtToVtt(roSrt)
+  console.log(`[jobs] base RO artifacts ready`, { jobId: job.id, roSrtBytes: roSrt.length, roVttBytes: roVtt.length })
 
   if (job.generateSubtitles) {
     addArtifact(job.id, {
@@ -339,12 +347,19 @@ async function finalizeJob(job: Job) {
       if (selectedTrack) {
         try {
           srt = await fetchCaptionsSrtFromTrack(selectedTrack, lang)
+          if (srt) {
+            console.log(`[jobs] lang SRT from YouTube tlang`, { jobId: job.id, lang, srtBytes: srt.length })
+          } else {
+            console.log(`[jobs] tlang not available, will translate locally`, { jobId: job.id, lang })
+          }
         } catch {}
       }
       if (!srt) {
         srt = await translateSrtPreserveTiming(roSrt, lang)
+        console.log(`[jobs] lang SRT via local translate`, { jobId: job.id, lang, srtBytes: srt.length })
       }
       const vtt = srtToVtt(srt)
+      console.log(`[jobs] lang VTT created`, { jobId: job.id, lang, vttBytes: vtt.length })
       addArtifact(job.id, {
         id: crypto.randomUUID(),
         jobId: job.id,
@@ -366,6 +381,7 @@ async function finalizeJob(job: Job) {
 
       const td = await translateTitleAndDescription(baseTitle, baseDescription ?? "Descriere automată", lang)
       const titlesDesc = `Title: ${td.title}\n\nDescription: ${td.description}`
+      console.log(`[jobs] titles/descriptions translated`, { jobId: job.id, lang, titleLen: td.title.length, descLen: td.description.length })
       addArtifact(job.id, {
         id: crypto.randomUUID(),
         jobId: job.id,
@@ -382,6 +398,7 @@ async function finalizeJob(job: Job) {
   const finalStepsSource = (getStore().jobs.get(job.id)?.steps ?? []) as ProcessingStepState[]
   const finalSteps: ProcessingStepState[] = finalStepsSource.map<ProcessingStepState>((s, i, arr) => i === arr.length - 1 ? { ...s, status: "completed", progress: 100 } : s)
   updateJob(job.id, { steps: finalSteps as ProcessingStepState[] })
+  console.log(`[jobs] finalize done`, { jobId: job.id })
 }
 
 export function slugify(input: string): string {
