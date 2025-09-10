@@ -107,8 +107,8 @@ export default function ImportPage() {
     try {
       // For now, we only send metadata and optional SRT content.
       const payload: any = {
-        filename: selectedFile?.name,
-        title: selectedFile?.name || selectedSrt?.name || "Proiect",
+        filename: selectedFile?.name || selectedSrt?.name || selectedSbv?.name,
+        title: selectedFile?.name || selectedSrt?.name || selectedSbv?.name || "Proiect",
         sourceLanguage,
         targetLanguages,
         generateSubtitles,

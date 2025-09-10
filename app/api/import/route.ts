@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createJob } from "@/lib/jobs"
+import { sbvToSrt } from "@/lib/utils"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -25,8 +26,8 @@ export async function POST(request: Request) {
         sbvContent,
       } = body ?? {}
 
-      if (!youtubeUrl && !filename) {
-        return NextResponse.json({ error: "Provide youtubeUrl or filename" }, { status: 400 })
+      if (!youtubeUrl && !filename && !srtContent && !sbvContent) {
+        return NextResponse.json({ error: "Provide youtubeUrl, filename, srtContent or sbvContent" }, { status: 400 })
       }
 
       const job = createJob({
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
         generateSubtitles,
         generateTranslations,
         forceStt,
-        uploadedSrt: typeof srtContent === "string" ? srtContent : (typeof sbvContent === "string" ? require("@/lib/utils").sbvToSrt(sbvContent) : undefined),
+        uploadedSrt: typeof srtContent === "string" ? srtContent : (typeof sbvContent === "string" ? sbvToSrt(sbvContent) : undefined),
       })
 
       return NextResponse.json({ jobId: job.id }, { status: 201 })

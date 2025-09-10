@@ -55,7 +55,7 @@ export default function LocalizeStudio() {
     setIsSubmitting(true)
     try {
       const payload: any = {
-        filename: selectedSrt?.name,
+        filename: selectedSrt?.name || selectedSbv?.name,
         title: selectedSrt?.name || selectedSbv?.name,
         sourceLanguage,
         targetLanguages,
