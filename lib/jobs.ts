@@ -263,144 +263,162 @@ function simulateProcessing(job: Job) {
 
 async function finalizeJob(job: Job) {
   console.log(`[jobs] finalize start`, { jobId: job.id })
-  let baseTitle = job.title || (job.source.kind === "youtube" ? (job.source.url ?? "YouTube video") : (job.source.filename ?? "Video"))
-  let baseDescription: string | undefined
-  if (job.source.kind === "youtube" && job.source.url) {
-    const details = await getVideoDetails(job.source.url)
-    if (details) {
-      if (!job.title && details.title) baseTitle = details.title
-      baseDescription = details.description
-    }
-  }
-
-  let roSrt = ""
-  let selectedTrack: any = null
+  let hadError = false
   try {
-    if (job.uploadedSrt && job.uploadedSrt.trim().length > 0) {
-      roSrt = job.uploadedSrt
-      console.log(`[jobs] using uploaded SRT`, { jobId: job.id, srtBytes: roSrt.length })
-      updateJob(job.id, { transcriptSource: "uploaded", captionsTrack: undefined })
-    } else if (job.forceStt && job.source.kind === "youtube" && job.source.url) {
-      const segments = await transcribeFromYoutubeUrl(job.source.url)
-      roSrt = segmentsToSrt(segments, (t) => t)
-      console.log(`[jobs] used STT (forced)`, { jobId: job.id, segments: segments.length, srtBytes: roSrt.length })
-      updateJob(job.id, { transcriptSource: "stt", captionsTrack: undefined })
-    } else if (job.source.kind === "youtube" && job.source.url) {
-      // 1) Try to fetch existing captions (prefer RO, then EN)
-      const caps = await fetchPreferredCaptions(job.source.url, [job.sourceLanguage === "auto" ? "ro" : job.sourceLanguage, "ro", "en"]) 
-      if (caps?.srt) {
-        roSrt = caps.srt
-        selectedTrack = caps.track
-        console.log(`[jobs] using YouTube captions`, { jobId: job.id, languageCode: (caps.track as any)?.languageCode, srtBytes: roSrt.length })
-        updateJob(job.id, {
-          transcriptSource: "captions",
-          captionsTrack: {
-            languageCode: (caps.track as any)?.languageCode,
-            name: (caps.track as any)?.name?.simpleText,
-            kind: (caps.track as any)?.kind,
-          },
-        })
-      } else {
-        // 2) Fallback: STT
+    let baseTitle = job.title || (job.source.kind === "youtube" ? (job.source.url ?? "YouTube video") : (job.source.filename ?? "Video"))
+    let baseDescription: string | undefined
+    if (job.source.kind === "youtube" && job.source.url) {
+      const details = await getVideoDetails(job.source.url)
+      if (details) {
+        if (!job.title && details.title) baseTitle = details.title
+        baseDescription = details.description
+      }
+    }
+
+    let roSrt = ""
+    let selectedTrack: any = null
+    try {
+      if (job.uploadedSrt && job.uploadedSrt.trim().length > 0) {
+        roSrt = job.uploadedSrt
+        console.log(`[jobs] using uploaded SRT`, { jobId: job.id, srtBytes: roSrt.length })
+        updateJob(job.id, { transcriptSource: "uploaded", captionsTrack: undefined })
+      } else if (job.forceStt && job.source.kind === "youtube" && job.source.url) {
         const segments = await transcribeFromYoutubeUrl(job.source.url)
         roSrt = segmentsToSrt(segments, (t) => t)
-        console.log(`[jobs] used STT (fallback)`, { jobId: job.id, segments: segments.length, srtBytes: roSrt.length })
+        console.log(`[jobs] used STT (forced)`, { jobId: job.id, segments: segments.length, srtBytes: roSrt.length })
         updateJob(job.id, { transcriptSource: "stt", captionsTrack: undefined })
+      } else if (job.source.kind === "youtube" && job.source.url) {
+        const caps = await fetchPreferredCaptions(job.source.url, [job.sourceLanguage === "auto" ? "ro" : job.sourceLanguage, "ro", "en"]) 
+        if (caps?.srt) {
+          roSrt = caps.srt
+          selectedTrack = caps.track
+          console.log(`[jobs] using YouTube captions`, { jobId: job.id, languageCode: (caps.track as any)?.languageCode, srtBytes: roSrt.length })
+          updateJob(job.id, {
+            transcriptSource: "captions",
+            captionsTrack: {
+              languageCode: (caps.track as any)?.languageCode,
+              name: (caps.track as any)?.name?.simpleText,
+              kind: (caps.track as any)?.kind,
+            },
+          })
+        } else {
+          const segments = await transcribeFromYoutubeUrl(job.source.url)
+          roSrt = segmentsToSrt(segments, (t) => t)
+          console.log(`[jobs] used STT (fallback)`, { jobId: job.id, segments: segments.length, srtBytes: roSrt.length })
+          updateJob(job.id, { transcriptSource: "stt", captionsTrack: undefined })
+        }
+      } else {
+        roSrt = generateSrtSample("Bună ziua și bun venit la acest tutorial...")
+        console.log(`[jobs] used sample SRT`, { jobId: job.id })
+        updateJob(job.id, { transcriptSource: "sample", captionsTrack: undefined })
       }
-    } else {
+    } catch {
       roSrt = generateSrtSample("Bună ziua și bun venit la acest tutorial...")
-      console.log(`[jobs] used sample SRT`, { jobId: job.id })
+      console.log(`[jobs] error preparing RO SRT, falling back to sample`, { jobId: job.id })
       updateJob(job.id, { transcriptSource: "sample", captionsTrack: undefined })
     }
-  } catch {
-    roSrt = generateSrtSample("Bună ziua și bun venit la acest tutorial...")
-    console.log(`[jobs] error preparing RO SRT, falling back to sample`, { jobId: job.id })
-    updateJob(job.id, { transcriptSource: "sample", captionsTrack: undefined })
-  }
-  const roVtt = srtToVtt(roSrt)
-  console.log(`[jobs] base RO artifacts ready`, { jobId: job.id, roSrtBytes: roSrt.length, roVttBytes: roVtt.length })
+    const roVtt = srtToVtt(roSrt)
+    console.log(`[jobs] base RO artifacts ready`, { jobId: job.id, roSrtBytes: roSrt.length, roVttBytes: roVtt.length })
 
-  if (job.generateSubtitles) {
-    addArtifact(job.id, {
-      id: crypto.randomUUID(),
-      jobId: job.id,
-      language: "ro",
-      filename: `${slugify(baseTitle)}_ro.srt`,
-      contentType: "application/x-subrip",
-      type: "subtitle-srt",
-      sizeBytes: roSrt.length,
-    }, roSrt)
-    addArtifact(job.id, {
-      id: crypto.randomUUID(),
-      jobId: job.id,
-      language: "ro",
-      filename: `${slugify(baseTitle)}_ro.vtt`,
-      contentType: "text/vtt",
-      type: "subtitle-vtt",
-      sizeBytes: roVtt.length,
-    }, roVtt)
-  }
-
-  if (job.generateTranslations) {
-    const allTargets = job.languages
-    for (const lang of allTargets) {
-      // Prefer YouTube auto-translate from the selected track if available, else local translate
-      let srt: string | null = null
-      if (selectedTrack) {
-        try {
-          srt = await fetchCaptionsSrtFromTrack(selectedTrack, lang)
-          if (srt) {
-            console.log(`[jobs] lang SRT from YouTube tlang`, { jobId: job.id, lang, srtBytes: srt.length })
-          } else {
-            console.log(`[jobs] tlang not available, will translate locally`, { jobId: job.id, lang })
-          }
-        } catch {}
+    try {
+      if (job.generateSubtitles) {
+        addArtifact(job.id, {
+          id: crypto.randomUUID(),
+          jobId: job.id,
+          language: "ro",
+          filename: `${slugify(baseTitle)}_ro.srt`,
+          contentType: "application/x-subrip",
+          type: "subtitle-srt",
+          sizeBytes: roSrt.length,
+        }, roSrt)
+        addArtifact(job.id, {
+          id: crypto.randomUUID(),
+          jobId: job.id,
+          language: "ro",
+          filename: `${slugify(baseTitle)}_ro.vtt`,
+          contentType: "text/vtt",
+          type: "subtitle-vtt",
+          sizeBytes: roVtt.length,
+        }, roVtt)
       }
-      if (!srt) {
-        srt = await translateSrtPreserveTiming(roSrt, lang)
-        console.log(`[jobs] lang SRT via local translate`, { jobId: job.id, lang, srtBytes: srt.length })
-      }
-      const vtt = srtToVtt(srt)
-      console.log(`[jobs] lang VTT created`, { jobId: job.id, lang, vttBytes: vtt.length })
-      addArtifact(job.id, {
-        id: crypto.randomUUID(),
-        jobId: job.id,
-        language: lang,
-        filename: `${slugify(baseTitle)}_${lang}.srt`,
-        contentType: "application/x-subrip",
-        type: "subtitle-srt",
-        sizeBytes: srt.length,
-      }, srt)
-      addArtifact(job.id, {
-        id: crypto.randomUUID(),
-        jobId: job.id,
-        language: lang,
-        filename: `${slugify(baseTitle)}_${lang}.vtt`,
-        contentType: "text/vtt",
-        type: "subtitle-vtt",
-        sizeBytes: vtt.length,
-      }, vtt)
-
-      const td = await translateTitleAndDescription(baseTitle, baseDescription ?? "Descriere automată", lang)
-      const titlesDesc = `Title: ${td.title}\n\nDescription: ${td.description}`
-      console.log(`[jobs] titles/descriptions translated`, { jobId: job.id, lang, titleLen: td.title.length, descLen: td.description.length })
-      addArtifact(job.id, {
-        id: crypto.randomUUID(),
-        jobId: job.id,
-        language: lang,
-        filename: `${slugify(baseTitle)}_${lang}_titles_descriptions.txt`,
-        contentType: "text/plain",
-        type: "titles-descriptions",
-        sizeBytes: titlesDesc.length,
-      }, titlesDesc)
+    } catch (e) {
+      hadError = true
+      console.log(`[jobs] error adding RO artifacts`, { jobId: job.id, error: (e as any)?.message })
     }
-  }
 
-  updateJob(job.id, { status: "completed", progress: 100, completedAt: Date.now() })
-  const finalStepsSource = (getStore().jobs.get(job.id)?.steps ?? []) as ProcessingStepState[]
-  const finalSteps: ProcessingStepState[] = finalStepsSource.map<ProcessingStepState>((s, i, arr) => i === arr.length - 1 ? { ...s, status: "completed", progress: 100 } : s)
-  updateJob(job.id, { steps: finalSteps as ProcessingStepState[] })
-  console.log(`[jobs] finalize done`, { jobId: job.id })
+    if (job.generateTranslations) {
+      const allTargets = job.languages
+      for (const lang of allTargets) {
+        try {
+          let srt: string | null = null
+          if (selectedTrack) {
+            try {
+              srt = await fetchCaptionsSrtFromTrack(selectedTrack, lang)
+              if (srt) {
+                console.log(`[jobs] lang SRT from YouTube tlang`, { jobId: job.id, lang, srtBytes: srt.length })
+              } else {
+                console.log(`[jobs] tlang not available, will translate locally`, { jobId: job.id, lang })
+              }
+            } catch {}
+          }
+          if (!srt) {
+            srt = await translateSrtPreserveTiming(roSrt, lang)
+            console.log(`[jobs] lang SRT via local translate`, { jobId: job.id, lang, srtBytes: srt.length })
+          }
+          const vtt = srtToVtt(srt)
+          console.log(`[jobs] lang VTT created`, { jobId: job.id, lang, vttBytes: vtt.length })
+          addArtifact(job.id, {
+            id: crypto.randomUUID(),
+            jobId: job.id,
+            language: lang,
+            filename: `${slugify(baseTitle)}_${lang}.srt`,
+            contentType: "application/x-subrip",
+            type: "subtitle-srt",
+            sizeBytes: srt.length,
+          }, srt)
+          addArtifact(job.id, {
+            id: crypto.randomUUID(),
+            jobId: job.id,
+            language: lang,
+            filename: `${slugify(baseTitle)}_${lang}.vtt`,
+            contentType: "text/vtt",
+            type: "subtitle-vtt",
+            sizeBytes: vtt.length,
+          }, vtt)
+
+          const td = await translateTitleAndDescription(baseTitle, baseDescription ?? "Descriere automată", lang)
+          const titlesDesc = `Title: ${td.title}\n\nDescription: ${td.description}`
+          console.log(`[jobs] titles/descriptions translated`, { jobId: job.id, lang, titleLen: td.title.length, descLen: td.description.length })
+          addArtifact(job.id, {
+            id: crypto.randomUUID(),
+            jobId: job.id,
+            language: lang,
+            filename: `${slugify(baseTitle)}_${lang}_titles_descriptions.txt`,
+            contentType: "text/plain",
+            type: "titles-descriptions",
+            sizeBytes: titlesDesc.length,
+          }, titlesDesc)
+        } catch (e) {
+          hadError = true
+          console.log(`[jobs] error translating/adding artifacts`, { jobId: job.id, lang, error: (e as any)?.message })
+          continue
+        }
+      }
+    }
+  } catch (e) {
+    hadError = true
+    console.log(`[jobs] finalize fatal error`, { jobId: job.id, error: (e as any)?.message })
+  } finally {
+    if (hadError) {
+      updateJob(job.id, { status: "error", progress: 100, completedAt: Date.now(), errorMessage: "Finalize error" })
+    } else {
+      updateJob(job.id, { status: "completed", progress: 100, completedAt: Date.now() })
+    }
+    const finalStepsSource = (getStore().jobs.get(job.id)?.steps ?? []) as ProcessingStepState[]
+    const finalSteps: ProcessingStepState[] = finalStepsSource.map<ProcessingStepState>((s, i, arr) => i === arr.length - 1 ? { ...s, status: hadError ? "error" : "completed", progress: 100 } : s)
+    updateJob(job.id, { steps: finalSteps as ProcessingStepState[] })
+    console.log(`[jobs] finalize done`, { jobId: job.id, hadError })
+  }
 }
 
 export function slugify(input: string): string {
