@@ -53,6 +53,7 @@ export default function ProcessingPage() {
   const [isProcessing, setIsProcessing] = useState(true)
   const [jobTitle, setJobTitle] = useState<string>("Procesare videoclip")
   const [jobUrlInfo, setJobUrlInfo] = useState<string>("")
+  const [transcriptInfo, setTranscriptInfo] = useState<string>("")
 
   const [steps, setSteps] = useState<ProcessingStep[]>([])
 
@@ -74,6 +75,22 @@ export default function ProcessingPage() {
           setJobUrlInfo(`${data.source.filename}`)
         } else {
           setJobUrlInfo("")
+        }
+        {
+          const src: string | undefined = data.transcriptSource
+          let info = ""
+          if (src === "captions") {
+            const lang = data.captionsTrack?.languageCode ? `${data.captionsTrack.languageCode}` : ""
+            const name = data.captionsTrack?.name ? ` – ${data.captionsTrack.name}` : ""
+            info = `Sursă transcript: Captions${lang ? ` (${lang}${name})` : ""}`
+          } else if (src === "stt") {
+            info = "Sursă transcript: STT (fallback)"
+          } else if (src === "sample") {
+            info = "Sursă transcript: Eșantion (demo)"
+          } else {
+            info = "Sursă transcript: Necunoscut"
+          }
+          setTranscriptInfo(info)
         }
         const mappedSteps: ProcessingStep[] = (data.steps || []).map((s: any) => ({
           id: s.id,
@@ -155,6 +172,9 @@ export default function ProcessingPage() {
                     <div>
                       <CardTitle className="text-foreground text-lg">{jobTitle}</CardTitle>
                       <CardDescription className="text-muted-foreground">{jobUrlInfo}</CardDescription>
+                      {transcriptInfo && (
+                        <div className="text-xs text-muted-foreground mt-1">{transcriptInfo}</div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">

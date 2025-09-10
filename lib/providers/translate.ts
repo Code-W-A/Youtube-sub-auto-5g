@@ -79,3 +79,37 @@ Description: <translated description>`
 }
 
 
+export async function translateSrtPreserveTiming(srt: string, targetLanguageCode: string): Promise<string> {
+  const client = getOpenAIClient()
+  if (!client) {
+    // Fallback: keep original text but tag language (still preserves link content)
+    const lines = srt.split("\n")
+    const out: string[] = []
+    for (const line of lines) {
+      // Keep index and timing lines as-is; only touch text lines
+      if (/^\d+$/.test(line) || /-->/.test(line) || line.trim() === "") {
+        out.push(line)
+      } else {
+        out.push(`[${targetLanguageCode.toUpperCase()}] ${line}`)
+      }
+    }
+    return out.join("\n")
+  }
+  try {
+    const system = `You are a subtitle translator. Translate the SRT subtitle file contents into ${targetLanguageCode}.\nRules:\n- Strictly preserve SRT structure: keep index numbers and timecodes exactly the same.\n- Only translate the subtitle text lines.\n- Do not merge or split lines.\n- Do not add commentary.`
+    const res = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: srt },
+      ],
+      temperature: 0.1,
+    })
+    const txt = res.choices?.[0]?.message?.content?.toString() ?? ""
+    return txt.trim() || srt
+  } catch {
+    return srt
+  }
+}
+
+

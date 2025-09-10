@@ -38,6 +38,7 @@ export default function ResultsPage() {
   const [editingDescription, setEditingDescription] = useState<string | null>(null)
 
   const [projectTitle, setProjectTitle] = useState<string>("Rezultate procesare")
+  const [transcriptInfo, setTranscriptInfo] = useState<string>("")
   const [subtitleFiles, setSubtitleFiles] = useState<SubtitleFile[]>([])
   const [titlesDescriptions, setTitlesDescriptions] = useState<TitleDescription[]>([])
 
@@ -65,6 +66,20 @@ export default function ResultsPage() {
       if (jobRes.ok) {
         const job = await jobRes.json()
         setProjectTitle(job.title || "Rezultate procesare")
+        const src: string | undefined = job.transcriptSource
+        let info = ""
+        if (src === "captions") {
+          const lang = job.captionsTrack?.languageCode ? `${job.captionsTrack.languageCode}` : ""
+          const name = job.captionsTrack?.name ? ` – ${job.captionsTrack.name}` : ""
+          info = `Sursă transcript: Captions${lang ? ` (${lang}${name})` : ""}`
+        } else if (src === "stt") {
+          info = "Sursă transcript: STT (fallback)"
+        } else if (src === "sample") {
+          info = "Sursă transcript: Eșantion (demo)"
+        } else {
+          info = "Sursă transcript: Necunoscut"
+        }
+        setTranscriptInfo(info)
       }
       const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/artifacts`)
       if (!res.ok) return
@@ -145,6 +160,9 @@ export default function ResultsPage() {
               <div>
                 <h2 className="text-2xl font-semibold text-foreground">{projectTitle}</h2>
                 <p className="text-muted-foreground">Finalizat cu succes</p>
+                {transcriptInfo && (
+                  <div className="text-xs text-muted-foreground mt-1">{transcriptInfo}</div>
+                )}
               </div>
             </div>
             <div className="flex items-center space-x-3">
