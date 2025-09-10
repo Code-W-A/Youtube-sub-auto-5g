@@ -32,11 +32,25 @@ export async function getCaptionTracks(youtubeUrl: string): Promise<CaptionTrack
 }
 
 export function pickCaptionTrack(tracks: CaptionTrack[], preferLangs: string[] = ["ro", "en"]): CaptionTrack | null {
-  for (const lang of preferLangs) {
-    const exact = tracks.find((t) => (t.languageCode || "").toLowerCase() === lang.toLowerCase())
-    if (exact) return exact
+  const norm = (s?: string) => (s || "").toLowerCase()
+  const isAsr = (t: CaptionTrack) => norm(t.kind) === "asr"
+
+  // Try preferred languages first (exact or regional variants), prefer non-ASR
+  for (const pref of preferLangs) {
+    const base = norm(pref).split("-")[0]
+    const candidates = tracks.filter((t) => {
+      const lc = norm(t.languageCode)
+      return lc === base || lc === norm(pref) || lc.startsWith(base + "-")
+    })
+    if (candidates.length > 0) {
+      const human = candidates.find((t) => !isAsr(t))
+      return human || candidates[0]
+    }
   }
-  return tracks[0] || null
+
+  // Otherwise pick any non-ASR track, else first available
+  const anyHuman = tracks.find((t) => !isAsr(t))
+  return anyHuman || tracks[0] || null
 }
 
 async function fetchText(url: string): Promise<string | null> {

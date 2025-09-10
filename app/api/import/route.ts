@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
 import { createJob } from "@/lib/jobs"
 
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
+export const preferredRegion = "iad1"
+
 export async function POST(request: Request) {
   try {
     const contentType = request.headers.get("content-type") || ""

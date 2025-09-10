@@ -234,12 +234,14 @@ async function finalizeJob(job: Job) {
   }
 
   let roSrt = ""
+  let selectedTrack: any = null
   try {
     if (job.source.kind === "youtube" && job.source.url) {
       // 1) Try to fetch existing captions (prefer RO, then EN)
       const caps = await fetchPreferredCaptions(job.source.url, [job.sourceLanguage === "auto" ? "ro" : job.sourceLanguage, "ro", "en"]) 
       if (caps?.srt) {
         roSrt = caps.srt
+        selectedTrack = caps.track
         updateJob(job.id, {
           transcriptSource: "captions",
           captionsTrack: {
@@ -288,7 +290,16 @@ async function finalizeJob(job: Job) {
   if (job.generateTranslations) {
     const allTargets = job.languages
     for (const lang of allTargets) {
-      const srt = await translateSrtPreserveTiming(roSrt, lang)
+      // Prefer YouTube auto-translate from the selected track if available, else local translate
+      let srt: string | null = null
+      if (selectedTrack) {
+        try {
+          srt = await fetchCaptionsSrtFromTrack(selectedTrack, lang)
+        } catch {}
+      }
+      if (!srt) {
+        srt = await translateSrtPreserveTiming(roSrt, lang)
+      }
       const vtt = srtToVtt(srt)
       addArtifact(job.id, {
         id: crypto.randomUUID(),
