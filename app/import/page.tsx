@@ -37,6 +37,7 @@ export default function ImportPage() {
   const [targetLanguages, setTargetLanguages] = useState<string[]>([])
   const [generateSubtitles, setGenerateSubtitles] = useState(true)
   const [generateTranslations, setGenerateTranslations] = useState(true)
+  const [forceStt, setForceStt] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
@@ -116,6 +117,7 @@ export default function ImportPage() {
         targetLanguages,
         generateSubtitles,
         generateTranslations,
+        forceStt,
       }
       const res = await fetch("/api/import", {
         method: "POST",
@@ -382,6 +384,13 @@ export default function ImportPage() {
                   <p className="text-sm text-muted-foreground">Traduce subtitrările și generează titluri + descrieri</p>
                 </div>
                 <Switch checked={generateTranslations} onCheckedChange={setGenerateTranslations} />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label className="text-foreground">Forțează STT (Whisper)</Label>
+                  <p className="text-sm text-muted-foreground">Ignoră captions YouTube și transcrie direct din audio</p>
+                </div>
+                <Switch checked={forceStt} onCheckedChange={setForceStt} />
               </div>
             </CardContent>
           </Card>

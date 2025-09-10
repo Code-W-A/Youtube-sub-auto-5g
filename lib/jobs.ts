@@ -42,6 +42,7 @@ export interface Job {
   errorMessage?: string
   transcriptSource?: "captions" | "stt" | "sample"
   captionsTrack?: { languageCode?: string; name?: string; kind?: string }
+  forceStt?: boolean
 }
 
 // In-memory stores (dev-only). Persist on global to survive hot-reloads and route isolates.
@@ -90,6 +91,7 @@ export interface CreateJobInput {
   targetLanguages: string[]
   generateSubtitles: boolean
   generateTranslations: boolean
+  forceStt?: boolean
 }
 
 export function createJob(input: CreateJobInput): Job {
@@ -147,6 +149,7 @@ export function createJob(input: CreateJobInput): Job {
     sourceLanguage: input.sourceLanguage,
     generateSubtitles: input.generateSubtitles,
     generateTranslations: input.generateTranslations,
+    forceStt: input.forceStt ?? false,
     createdAt: Date.now(),
     steps,
   }
@@ -154,6 +157,35 @@ export function createJob(input: CreateJobInput): Job {
   const store = getStore()
   store.jobs.set(id, job)
   store.artifactsByJob.set(id, [])
+
+  // Fire-and-forget: early probe of transcript source so UI can display it during processing
+  ;(async () => {
+    try {
+      if (job.forceStt) {
+        updateJob(job.id, { transcriptSource: "stt", captionsTrack: undefined })
+      } else if (job.source.kind === "youtube" && job.source.url) {
+        const caps = await fetchPreferredCaptions(job.source.url, [job.sourceLanguage === "auto" ? "ro" : job.sourceLanguage, "ro", "en"]) 
+        if (caps?.srt) {
+          console.log(`[jobs] captions found for job ${job.id}:`, (caps.track as any)?.languageCode, (caps.track as any)?.name?.simpleText)
+          updateJob(job.id, {
+            transcriptSource: "captions",
+            captionsTrack: {
+              languageCode: (caps.track as any)?.languageCode,
+              name: (caps.track as any)?.name?.simpleText,
+              kind: (caps.track as any)?.kind,
+            },
+          })
+        } else {
+          console.log(`[jobs] no captions found, will fallback to STT for job ${job.id}`)
+          updateJob(job.id, { transcriptSource: "stt", captionsTrack: undefined })
+        }
+      } else if (job.source.kind === "upload") {
+        updateJob(job.id, { transcriptSource: "sample", captionsTrack: undefined })
+      }
+    } catch (e) {
+      console.log(`[jobs] probe transcript failed for job ${job.id}`, e)
+    }
+  })()
 
   // Simulate processing pipeline
   simulateProcessing(job)
@@ -236,7 +268,11 @@ async function finalizeJob(job: Job) {
   let roSrt = ""
   let selectedTrack: any = null
   try {
-    if (job.source.kind === "youtube" && job.source.url) {
+    if (job.forceStt && job.source.kind === "youtube" && job.source.url) {
+      const segments = await transcribeFromYoutubeUrl(job.source.url)
+      roSrt = segmentsToSrt(segments, (t) => t)
+      updateJob(job.id, { transcriptSource: "stt", captionsTrack: undefined })
+    } else if (job.source.kind === "youtube" && job.source.url) {
       // 1) Try to fetch existing captions (prefer RO, then EN)
       const caps = await fetchPreferredCaptions(job.source.url, [job.sourceLanguage === "auto" ? "ro" : job.sourceLanguage, "ro", "en"]) 
       if (caps?.srt) {

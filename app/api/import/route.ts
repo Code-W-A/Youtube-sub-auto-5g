@@ -20,6 +20,7 @@ export async function POST(request: Request) {
         targetLanguages = [],
         generateSubtitles = true,
         generateTranslations = true,
+        forceStt = false,
       } = body ?? {}
 
       if (!youtubeUrl && !filename) {
@@ -33,6 +34,7 @@ export async function POST(request: Request) {
         targetLanguages,
         generateSubtitles,
         generateTranslations,
+        forceStt,
       })
 
       return NextResponse.json({ jobId: job.id }, { status: 201 })
