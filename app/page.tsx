@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Upload, FileVideo, Download, Play, Package, Eye, Copy, CheckCircle } from "lucide-react"
+import { Upload, FileVideo, Download, Play, Package, Eye, CheckCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import JSZip from "jszip"
@@ -21,7 +21,7 @@ const SUPPORTED_LANGUAGES = [
   { code: "ja", name: "日本語" },
 ]
 
-type ArtifactType = "subtitle-srt" | "subtitle-vtt" | "titles-descriptions"
+type ArtifactType = "subtitle-srt"
 
 type ApiArtifact = {
   language: string
@@ -85,46 +85,27 @@ export default function LocalizeStudio() {
   )
 
   const subtitleFiles = useMemo(() => {
-    const subs: Array<{ language: string; languageName: string; flag: string; hasSrt: boolean; hasVtt: boolean; srt?: ApiArtifact; vtt?: ApiArtifact; sizeLabel: string }> = []
-    const byLang: Record<string, { srt?: ApiArtifact; vtt?: ApiArtifact }> = {}
+    const subs: Array<{ language: string; languageName: string; flag: string; srt?: ApiArtifact; sizeLabel: string }> = []
+    const byLang: Record<string, { srt?: ApiArtifact }> = {}
     for (const a of artifacts) {
-      if (a.type === "subtitle-srt" || a.type === "subtitle-vtt") {
+      if (a.type === "subtitle-srt") {
         byLang[a.language] = byLang[a.language] || {}
-        if (a.type === "subtitle-srt") byLang[a.language].srt = a
-        if (a.type === "subtitle-vtt") byLang[a.language].vtt = a
+        byLang[a.language].srt = a
       }
     }
     for (const [lang, files] of Object.entries(byLang)) {
       const meta = languageMeta[lang] || { name: lang.toUpperCase(), flag: "🌐" }
-      const sizeBytes = (files.srt?.sizeBytes || 0) + (files.vtt?.sizeBytes || 0)
+      const sizeBytes = (files.srt?.sizeBytes || 0)
       subs.push({
         language: lang,
         languageName: meta.name,
         flag: meta.flag,
-        hasSrt: Boolean(files.srt),
-        hasVtt: Boolean(files.vtt),
         srt: files.srt,
-        vtt: files.vtt,
         sizeLabel: `${Math.max(1, Math.round(sizeBytes / 1024))} KB`,
       })
     }
     return subs.sort((a, b) => a.language.localeCompare(b.language))
   }, [artifacts, languageMeta])
-
-  const titlesDescriptions = useMemo(() => {
-    const out: Array<{ language: string; languageName: string; flag: string; title: string; description: string }> = []
-    for (const a of artifacts) {
-      if (a.type !== "titles-descriptions") continue
-      const meta = languageMeta[a.language] || { name: a.language.toUpperCase(), flag: "🌐" }
-      const lines = a.content.split("\n")
-      const titleLine = lines[0] || ""
-      const rest = lines.slice(1).join("\n")
-      const title = titleLine.replace(/^Title:\s*/i, "").trim() || projectTitle
-      const description = rest.replace(/^Description:\s*/i, "").trim()
-      out.push({ language: a.language, languageName: meta.name, flag: meta.flag, title, description })
-    }
-    return out.sort((a, b) => a.language.localeCompare(b.language))
-  }, [artifacts, languageMeta, projectTitle])
 
   useEffect(() => {
     if (phase !== "processing") return
@@ -148,10 +129,8 @@ export default function LocalizeStudio() {
       const zip = new JSZip()
       const rootName = (projectTitle || "proiect").toLowerCase().replace(/[^a-z0-9_\-]+/g, "_")
       const subsFolder = zip.folder(`${rootName}/Subtitrari`)
-      const titlesFolder = zip.folder(`${rootName}/Titluri_Descrieri`)
       for (const a of artifacts) {
-        if (a.type === "subtitle-srt" || a.type === "subtitle-vtt") subsFolder?.file(a.filename, a.content)
-        if (a.type === "titles-descriptions") titlesFolder?.file(a.filename, a.content)
+        if (a.type === "subtitle-srt") subsFolder?.file(a.filename, a.content)
       }
       const blob = await zip.generateAsync({ type: "blob" })
       const url = URL.createObjectURL(blob)
@@ -171,6 +150,7 @@ export default function LocalizeStudio() {
     setPhase("processing")
     setProgress(0)
     try {
+      console.log("[client] submit start", { hasSrt: Boolean(selectedSrt), hasSbv: Boolean(selectedSbv), targets: targetLanguages.length })
       const payload: any = {
         title: selectedSrt?.name || selectedSbv?.name,
         sourceLanguage,
@@ -192,6 +172,7 @@ export default function LocalizeStudio() {
       })
       if (!res.ok) throw new Error("Import failed")
       const data: { title: string; transcriptSource?: string; artifacts: ApiArtifact[] } = await res.json()
+      console.log("[client] process done", { artifacts: data.artifacts?.length || 0 })
       setProjectTitle(data.title || "Rezultate procesare")
       const src = data.transcriptSource
       let info = ""
@@ -205,6 +186,7 @@ export default function LocalizeStudio() {
       setProgress(100)
       setPhase("done")
     } catch (e: any) {
+      console.error("[client] process error", e)
       toast({
         title: "Eroare la pornirea procesării",
         description: e?.message || "Încearcă din nou.",
@@ -449,11 +431,11 @@ export default function LocalizeStudio() {
               </CardHeader>
             </Card>
 
-            {/* Subtitles */}
+            {/* Subtitrări (doar SRT) */}
             <Card className="border-border">
               <CardHeader>
                 <CardTitle className="text-foreground">Subtitrări</CardTitle>
-                <CardDescription>Fișiere .srt și .vtt generate</CardDescription>
+                <CardDescription>Fișiere .srt generate (corectate și traduse)</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -488,7 +470,6 @@ export default function LocalizeStudio() {
                           variant="outline"
                           size="sm"
                           className="border-border bg-transparent"
-                          disabled={!f.hasSrt}
                           onClick={() => {
                             if (f.srt) {
                               const blob = new Blob([f.srt.content], { type: f.srt.contentType })
@@ -504,100 +485,8 @@ export default function LocalizeStudio() {
                           <Download className="w-4 h-4 mr-2" />
                           .srt
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="border-border bg-transparent"
-                          disabled={!f.hasVtt}
-                          onClick={() => {
-                            if (f.vtt) {
-                              const blob = new Blob([f.vtt.content], { type: f.vtt.contentType })
-                              const url = URL.createObjectURL(blob)
-                              const a = document.createElement("a")
-                              a.href = url
-                              a.download = f.vtt.filename
-                              a.click()
-                              URL.revokeObjectURL(url)
-                            }
-                          }}
-                        >
-                          <Download className="w-4 h-4 mr-2" />
-                          .vtt
-                        </Button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Titles & Descriptions */}
-            <Card className="border-border">
-              <CardHeader>
-                <CardTitle className="text-foreground">Titluri & Descrieri</CardTitle>
-                <CardDescription>Generate pentru limbile selectate</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {titlesDescriptions.map((item) => (
-                    <Card key={item.language} className="border-border">
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-xl">{item.flag}</span>
-                            <CardTitle className="text-foreground">{item.languageName}</CardTitle>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-border"
-                            onClick={async () => {
-                              try {
-                                await navigator.clipboard.writeText(`${item.title}\n\n${item.description}`)
-                                toast({ title: "Copiat", description: "Titlu + descriere în clipboard" })
-                              } catch {}
-                            }}
-                          >
-                            <Copy className="w-4 h-4 mr-2" />
-                            Copiază tot
-                          </Button>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="space-y-1">
-                          <Label className="text-foreground">Titlu</Label>
-                          <div className="p-3 bg-muted border border-border rounded text-sm text-foreground">
-                            {item.title}
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-foreground">Descriere</Label>
-                          <div className="p-3 bg-muted border border-border rounded text-sm text-foreground max-h-[200px] overflow-y-auto">
-                            <pre className="whitespace-pre-wrap font-sans">{item.description}</pre>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-border bg-transparent"
-                            onClick={() => {
-                              const text = `${item.title}\n\n${item.description}`
-                              const blob = new Blob([text], { type: "text/plain" })
-                              const url = URL.createObjectURL(blob)
-                              const a = document.createElement("a")
-                              a.href = url
-                              a.download = `${item.language}_title_description.txt`
-                              a.click()
-                              URL.revokeObjectURL(url)
-                            }}
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            Descarcă .txt
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
                   ))}
                 </div>
               </CardContent>

@@ -122,3 +122,32 @@ export async function translateSrtPreserveTiming(srt: string, targetLanguageCode
 }
 
 
+export async function proofreadSrtPreserveTiming(srt: string, languageCode: string): Promise<string> {
+  const client = getOpenAIClient()
+  if (!client) {
+    // No API: return input unchanged
+    return srt
+  }
+  try {
+    const system = `You are a professional proofreader for ${languageCode}. Improve grammar, spelling, and diacritics while strictly preserving SRT structure.
+Rules:
+- Keep index numbers and timecodes exactly the same.
+- Only modify subtitle text lines.
+- Do not merge or split lines.
+- Do not add commentary.`
+    const res = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: srt },
+      ],
+      temperature: 0.1,
+    })
+    const txt = res.choices?.[0]?.message?.content?.toString() ?? ""
+    return txt.trim() || srt
+  } catch {
+    return srt
+  }
+}
+
+

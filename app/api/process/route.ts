@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { segmentsToSrt, srtToVtt, transcribeFromYoutubeUrl } from "@/lib/providers/stt"
-import { translateTitleAndDescription, translateSrtPreserveTiming } from "@/lib/providers/translate"
+import { segmentsToSrt, transcribeFromYoutubeUrl } from "@/lib/providers/stt"
+import { proofreadSrtPreserveTiming, translateSrtPreserveTiming } from "@/lib/providers/translate"
 import { fetchPreferredCaptions, fetchCaptionsSrtFromTrack, getVideoDetails } from "@/lib/providers/youtube"
 import { sbvToSrt } from "@/lib/utils"
 
@@ -8,7 +8,7 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 export const preferredRegion = "iad1"
 
-type ArtifactType = "subtitle-srt" | "subtitle-vtt" | "titles-descriptions"
+type ArtifactType = "subtitle-srt"
 
 function slugify(input: string): string {
   return input
@@ -39,6 +39,13 @@ export async function POST(request: Request) {
       srtContent,
       sbvContent,
     } = body ?? {}
+
+    console.log("[process] start", {
+      hasYoutube: Boolean(youtubeUrl),
+      hasSrt: typeof srtContent === "string" && srtContent?.length > 0,
+      hasSbv: typeof sbvContent === "string" && sbvContent?.length > 0,
+      targets: Array.isArray(targetLanguages) ? targetLanguages.length : 0,
+    })
 
     if (!youtubeUrl && !srtContent && !sbvContent) {
       return NextResponse.json({ error: "Provide youtubeUrl, srtContent or sbvContent" }, { status: 400 })
@@ -89,7 +96,13 @@ export async function POST(request: Request) {
       transcriptSource = "sample"
     }
 
-    const roVtt = srtToVtt(roSrt)
+    console.log("[process] transcript prepared", { transcriptSource, roSrtBytes: roSrt.length })
+
+    // Proofread RO subtitles (grammar + diacritics), preserving timings
+    if (generateSubtitles) {
+      roSrt = await proofreadSrtPreserveTiming(roSrt, "ro")
+    }
+    console.log("[process] ro proofread", { roSrtBytes: roSrt.length })
 
     type OutArtifact = {
       language: string
@@ -112,14 +125,6 @@ export async function POST(request: Request) {
         sizeBytes: roSrt.length,
         content: roSrt,
       })
-      artifacts.push({
-        language: "ro",
-        filename: `${root}_ro.vtt`,
-        contentType: "text/vtt",
-        type: "subtitle-vtt",
-        sizeBytes: roVtt.length,
-        content: roVtt,
-      })
     }
 
     if (generateTranslations) {
@@ -134,7 +139,9 @@ export async function POST(request: Request) {
           if (!srt) {
             srt = await translateSrtPreserveTiming(roSrt, lang)
           }
-          const vtt = srtToVtt(srt)
+          // Proofread translated subtitles as well
+          srt = await proofreadSrtPreserveTiming(srt, lang)
+          console.log("[process] translated+proofread", { lang, bytes: srt.length })
           artifacts.push({
             language: lang,
             filename: `${root}_${lang}.srt`,
@@ -143,31 +150,13 @@ export async function POST(request: Request) {
             sizeBytes: srt.length,
             content: srt,
           })
-          artifacts.push({
-            language: lang,
-            filename: `${root}_${lang}.vtt`,
-            contentType: "text/vtt",
-            type: "subtitle-vtt",
-            sizeBytes: vtt.length,
-            content: vtt,
-          })
-
-          const td = await translateTitleAndDescription(baseTitle, baseDescription ?? "Descriere automată", lang)
-          const titlesDesc = `Title: ${td.title}\n\nDescription: ${td.description}`
-          artifacts.push({
-            language: lang,
-            filename: `${root}_${lang}_titles_descriptions.txt`,
-            contentType: "text/plain",
-            type: "titles-descriptions",
-            sizeBytes: titlesDesc.length,
-            content: titlesDesc,
-          })
         } catch (e) {
           continue
         }
       }
     }
 
+    console.log("[process] done", { artifacts: artifacts.length })
     return NextResponse.json({
       title: baseTitle,
       transcriptSource,
