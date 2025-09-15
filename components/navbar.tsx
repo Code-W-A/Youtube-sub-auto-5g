@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 
 const navigation = [
-  { name: "Import SRT", href: "/" },
-  { name: "Procesare", href: "/processing" },
-  { name: "Rezultate", href: "/results" },
+  { name: "Procesare subtritari", href: "/" },
+  // { name: "Procesare", href: "/processing" },
+  // { name: "Rezultate", href: "/results" },
   // { name: "Istoric", href: "/history" },
   // { name: "Setări", href: "/settings" },
 ]
