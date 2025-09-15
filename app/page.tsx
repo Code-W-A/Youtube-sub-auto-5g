@@ -11,14 +11,47 @@ import { cn } from "@/lib/utils"
 import JSZip from "jszip"
 
 const SUPPORTED_LANGUAGES = [
-  { code: "en", name: "English" },
-  { code: "fr", name: "Français" },
-  { code: "es", name: "Español" },
-  { code: "de", name: "Deutsch" },
-  { code: "it", name: "Italiano" },
-  { code: "pt", name: "Português" },
-  { code: "ru", name: "Русский" },
-  { code: "ja", name: "日本語" },
+  { code: "sq", name: "Albaneză" },
+  { code: "ar", name: "Arabă" },
+  { code: "bs", name: "Bosniacă" },
+  { code: "bg", name: "Bulgară" },
+  { code: "cs", name: "Cehă" },
+  { code: "zh", name: "Chineză" },
+  { code: "ko", name: "Coreeană" },
+  { code: "co", name: "Corsicană" },
+  { code: "hr", name: "Croată" },
+  { code: "da", name: "Daneză" },
+  { code: "he", name: "Ebraică" },
+  { code: "en", name: "Engleză" },
+  { code: "et", name: "Estonă" },
+  { code: "fi", name: "Finlandeză" },
+  { code: "fr", name: "Franceză" },
+  { code: "ka", name: "Georgiană" },
+  { code: "de", name: "Germană" },
+  { code: "el", name: "Greacă" },
+  { code: "id", name: "Indoneziană" },
+  { code: "it", name: "Italiană" },
+  { code: "ja", name: "Japoneză" },
+  { code: "lv", name: "Letonă" },
+  { code: "lt", name: "Lituaniană" },
+  { code: "mk", name: "Macedoneană" },
+  { code: "hu", name: "Maghiară" },
+  { code: "mn", name: "Mongolă" },
+  { code: "nl", name: "Neerlandeză" },
+  { code: "no", name: "Norvegiană" },
+  { code: "fa", name: "Persană" },
+  { code: "pl", name: "Poloneză" },
+  { code: "pt", name: "Portugheză" },
+  { code: "ro", name: "Română" },
+  { code: "ru", name: "Rusă" },
+  { code: "sr", name: "Sârbă" },
+  { code: "sk", name: "Slovacă" },
+  { code: "sl", name: "Slovenă" },
+  { code: "es", name: "Spaniolă" },
+  { code: "sv", name: "Suedeză" },
+  { code: "th", name: "Thailandeză" },
+  { code: "tr", name: "Turcă" },
+  { code: "vi", name: "Vietnameză" },
 ]
 
 type ArtifactType = "subtitle-srt"
@@ -69,17 +102,47 @@ export default function LocalizeStudio() {
 
   const languageMeta: Record<string, { name: string; flag: string }> = useMemo(
     () => ({
+      sq: { name: "Albaneză", flag: "🇦🇱" },
+      ar: { name: "Arabă", flag: "🇸🇦" },
+      bs: { name: "Bosniacă", flag: "🇧🇦" },
+      bg: { name: "Bulgară", flag: "🇧🇬" },
+      cs: { name: "Cehă", flag: "🇨🇿" },
+      zh: { name: "Chineză", flag: "🇨🇳" },
+      ko: { name: "Coreeană", flag: "🇰🇷" },
+      co: { name: "Corsicană", flag: "🇫🇷" },
+      hr: { name: "Croată", flag: "🇭🇷" },
+      da: { name: "Daneză", flag: "🇩🇰" },
+      he: { name: "Ebraică", flag: "🇮🇱" },
+      en: { name: "Engleză", flag: "🇺🇸" },
+      et: { name: "Estonă", flag: "🇪🇪" },
+      fi: { name: "Finlandeză", flag: "🇫🇮" },
+      fr: { name: "Franceză", flag: "🇫🇷" },
+      ka: { name: "Georgiană", flag: "🇬🇪" },
+      de: { name: "Germană", flag: "🇩🇪" },
+      el: { name: "Greacă", flag: "🇬🇷" },
+      id: { name: "Indoneziană", flag: "🇮🇩" },
+      it: { name: "Italiană", flag: "🇮🇹" },
+      ja: { name: "Japoneză", flag: "🇯🇵" },
+      lv: { name: "Letonă", flag: "🇱🇻" },
+      lt: { name: "Lituaniană", flag: "🇱🇹" },
+      mk: { name: "Macedoneană", flag: "🇲🇰" },
+      hu: { name: "Maghiară", flag: "🇭🇺" },
+      mn: { name: "Mongolă", flag: "🇲🇳" },
+      nl: { name: "Neerlandeză", flag: "🇳🇱" },
+      no: { name: "Norvegiană", flag: "🇳🇴" },
+      fa: { name: "Persană", flag: "🇮🇷" },
+      pl: { name: "Poloneză", flag: "🇵🇱" },
+      pt: { name: "Portugheză", flag: "🇵🇹" },
       ro: { name: "Română", flag: "🇷🇴" },
-      en: { name: "English", flag: "🇺🇸" },
-      fr: { name: "Français", flag: "🇫🇷" },
-      es: { name: "Español", flag: "🇪🇸" },
-      de: { name: "Deutsch", flag: "🇩🇪" },
-      it: { name: "Italiano", flag: "🇮🇹" },
-      pt: { name: "Português", flag: "🇵🇹" },
-      ru: { name: "Русский", flag: "🇷🇺" },
-      ja: { name: "日本語", flag: "🇯🇵" },
-      ko: { name: "한국어", flag: "🇰🇷" },
-      zh: { name: "中文", flag: "🇨🇳" },
+      ru: { name: "Rusă", flag: "🇷🇺" },
+      sr: { name: "Sârbă", flag: "🇷🇸" },
+      sk: { name: "Slovacă", flag: "🇸🇰" },
+      sl: { name: "Slovenă", flag: "🇸🇮" },
+      es: { name: "Spaniolă", flag: "🇪🇸" },
+      sv: { name: "Suedeză", flag: "🇸🇪" },
+      th: { name: "Thailandeză", flag: "🇹🇭" },
+      tr: { name: "Turcă", flag: "🇹🇷" },
+      vi: { name: "Vietnameză", flag: "🇻🇳" },
     }),
     [],
   )
@@ -278,7 +341,7 @@ export default function LocalizeStudio() {
                 <CardTitle className="text-lg text-foreground">3. Opțiuni procesare</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="text-sm font-medium text-foreground">Calitate subtitrări</Label>
                     <Select defaultValue="high">
@@ -305,7 +368,7 @@ export default function LocalizeStudio() {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
+                </div> */}
 
                 <Button
                   className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"

@@ -11,6 +11,54 @@ function getOpenAIClient(): OpenAI | null {
   }
 }
 
+function resolveLanguageName(code: string): string {
+  const c = (code || "").toLowerCase()
+  const map: Record<string, string> = {
+    sq: "Albanian",
+    ar: "Arabic",
+    bs: "Bosnian",
+    bg: "Bulgarian",
+    cs: "Czech",
+    zh: "Chinese",
+    ko: "Korean",
+    co: "Corsican",
+    hr: "Croatian",
+    da: "Danish",
+    he: "Hebrew",
+    en: "English",
+    et: "Estonian",
+    fi: "Finnish",
+    fr: "French",
+    ka: "Georgian",
+    de: "German",
+    el: "Greek",
+    id: "Indonesian",
+    it: "Italian",
+    ja: "Japanese",
+    lv: "Latvian",
+    lt: "Lithuanian",
+    mk: "Macedonian",
+    hu: "Hungarian",
+    mn: "Mongolian",
+    nl: "Dutch",
+    no: "Norwegian",
+    fa: "Persian",
+    pl: "Polish",
+    pt: "Portuguese",
+    ro: "Romanian",
+    ru: "Russian",
+    sr: "Serbian",
+    sk: "Slovak",
+    sl: "Slovenian",
+    es: "Spanish",
+    sv: "Swedish",
+    th: "Thai",
+    tr: "Turkish",
+    vi: "Vietnamese",
+  }
+  return map[c] || code
+}
+
 export async function translateText(input: string, targetLanguageCode: string): Promise<string> {
   const client = getOpenAIClient()
   if (!client) {
@@ -18,7 +66,8 @@ export async function translateText(input: string, targetLanguageCode: string): 
     return `[${targetLanguageCode.toUpperCase()}] ${input}`
   }
   try {
-    const system = `You are a professional translator. Translate the user's text into the target language: ${targetLanguageCode}. Preserve meaning, tone, punctuation, and do not add commentary.`
+    const targetName = resolveLanguageName(targetLanguageCode)
+    const system = `You are a professional translator. Translate the user's text into ${targetName}. Preserve meaning, tone, punctuation, and do not add commentary.`
     const res = await client.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -50,7 +99,8 @@ export async function translateTitleAndDescription(
     }
   }
   try {
-    const prompt = `Translate the following YouTube video metadata into ${targetLanguageCode}:
+    const targetName = resolveLanguageName(targetLanguageCode)
+    const prompt = `Translate the following YouTube video metadata into ${targetName}:
 Title:
 ${baseTitle}
 
@@ -103,7 +153,8 @@ export async function translateSrtPreserveTiming(srt: string, targetLanguageCode
     return out.join("\n")
   }
   try {
-    const system = `You are a subtitle translator. Translate the SRT subtitle file contents into ${targetLanguageCode}.\nRules:\n- Strictly preserve SRT structure: keep index numbers and timecodes exactly the same.\n- Only translate the subtitle text lines.\n- Do not merge or split lines.\n- Do not add commentary.`
+    const targetName = resolveLanguageName(targetLanguageCode)
+    const system = `You are a subtitle translator. Translate the SRT subtitle file contents into ${targetName}.\nRules:\n- Strictly preserve SRT structure: keep index numbers and timecodes exactly the same.\n- Only translate the subtitle text lines.\n- Do not merge or split lines.\n- Do not add commentary.`
     const res = await client.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -129,7 +180,8 @@ export async function proofreadSrtPreserveTiming(srt: string, languageCode: stri
     return srt
   }
   try {
-    const system = `You are a professional proofreader for ${languageCode}. Improve grammar, spelling, and diacritics while strictly preserving SRT structure.
+    const languageName = resolveLanguageName(languageCode)
+    const system = `You are a professional proofreader for ${languageName}. Improve grammar, spelling, and diacritics while strictly preserving SRT structure.
 Rules:
 - Keep index numbers and timecodes exactly the same.
 - Only modify subtitle text lines.
