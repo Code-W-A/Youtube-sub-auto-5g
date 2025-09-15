@@ -98,6 +98,14 @@ export default function LocalizeStudio() {
     )
   }
 
+  const selectAllLanguages = () => {
+    setTargetLanguages(SUPPORTED_LANGUAGES.map((l) => l.code))
+  }
+
+  const clearAllLanguages = () => {
+    setTargetLanguages([])
+  }
+
   const canProcess = Boolean((selectedSrt || selectedSbv) && targetLanguages.length >= 0)
 
   const languageMeta: Record<string, { name: string; flag: string }> = useMemo(
@@ -314,6 +322,14 @@ export default function LocalizeStudio() {
                 <CardDescription>Alege limbile în care vrei să traduci subtitrările și titlul</CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="flex items-center justify-end mb-3">
+                  <Button variant="outline" size="sm" onClick={selectAllLanguages} className="bg-transparent mr-2">
+                    Selectează toate
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={clearAllLanguages} className="bg-transparent">
+                    Șterge toate
+                  </Button>
+                </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {SUPPORTED_LANGUAGES.map((lang) => {
                     const selected = targetLanguages.includes(lang.code)
