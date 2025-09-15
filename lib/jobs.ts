@@ -251,7 +251,8 @@ function simulateProcessing(job: Job) {
           const nextSteps: ProcessingStepState[] = steps.map<ProcessingStepState>((s, i) => (i === idx + 1 ? { ...s, status: "processing" } : s))
           updateJob(current.id, { steps: nextSteps as ProcessingStepState[] })
         } else {
-          // Keep last step as processing and run finalize; set progress near-complete
+          // Final step reached: mark it completed, set progress near-complete, then finalize
+          setStepStatus(current, processing.id, "completed")
           updateJob(current.id, { progress: 99 })
           finalizeJob(current)
           clearInterval(interval)
