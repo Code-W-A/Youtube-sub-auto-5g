@@ -611,7 +611,7 @@ export default function LocalizeStudio() {
                           </div>
                           <Button size="sm" className="mt-2 bg-primary hover:bg-primary/90 text-white" onClick={async () => {
                             await navigator.clipboard.writeText(item.title)
-                            toast({ title: "Copiat", description: "Titlul a fost copiat." })
+                            toast({ title: "Copiat", description: "Titlul a fost copiat.", duration: 3000 })
                           }}>
                             <Copy className="w-4 h-4 mr-2" />
                             Copiază titlul
@@ -624,7 +624,7 @@ export default function LocalizeStudio() {
                           </div>
                           <Button size="sm" className="mt-2 bg-primary hover:bg-primary/90 text-white" onClick={async () => {
                             await navigator.clipboard.writeText(item.description)
-                            toast({ title: "Copiat", description: "Descrierea a fost copiată." })
+                            toast({ title: "Copiat", description: "Descrierea a fost copiată.", duration: 3000 })
                           }}>
                             <Copy className="w-4 h-4 mr-2" />
                             Copiază descrierea
