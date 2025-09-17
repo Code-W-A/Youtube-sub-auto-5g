@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Upload, FileVideo, Download, Play, Package, Eye, CheckCircle } from "lucide-react"
@@ -70,6 +72,8 @@ export default function LocalizeStudio() {
 
   const [selectedSrt, setSelectedSrt] = useState<File | null>(null)
   const [selectedSbv, setSelectedSbv] = useState<File | null>(null)
+  const [metaTitle, setMetaTitle] = useState("")
+  const [metaDescription, setMetaDescription] = useState("")
   const [targetLanguages, setTargetLanguages] = useState<string[]>(["en", "fr"]) // default like UI
   const [sourceLanguage] = useState("auto")
   const [generateSubtitles] = useState(true)
@@ -82,6 +86,7 @@ export default function LocalizeStudio() {
   const [projectTitle, setProjectTitle] = useState<string>("Rezultate procesare")
   const [transcriptInfo, setTranscriptInfo] = useState<string>("")
   const [artifacts, setArtifacts] = useState<ApiArtifact[]>([])
+  const [translatedMeta, setTranslatedMeta] = useState<Array<{ language: string; title: string; description: string }>>([])
 
   const handleSrtSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
@@ -224,6 +229,8 @@ export default function LocalizeStudio() {
       console.log("[client] submit start", { hasSrt: Boolean(selectedSrt), hasSbv: Boolean(selectedSbv), targets: targetLanguages.length })
       const payload: any = {
         title: selectedSrt?.name || selectedSbv?.name,
+        metaTitle,
+        metaDescription,
         sourceLanguage,
         targetLanguages,
         generateSubtitles,
@@ -242,7 +249,7 @@ export default function LocalizeStudio() {
         body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error("Import failed")
-      const data: { title: string; transcriptSource?: string; artifacts: ApiArtifact[] } = await res.json()
+      const data: { title: string; transcriptSource?: string; artifacts: ApiArtifact[]; titlesDescriptions?: Array<{ language: string; title: string; description: string }> } = await res.json()
       console.log("[client] process done", { artifacts: data.artifacts?.length || 0 })
       setProjectTitle(data.title || "Rezultate procesare")
       const src = data.transcriptSource
@@ -254,6 +261,7 @@ export default function LocalizeStudio() {
       else info = "Sursă transcript: Necunoscut"
       setTranscriptInfo(info)
       setArtifacts(data.artifacts || [])
+      setTranslatedMeta(data.titlesDescriptions || [])
       setProgress(100)
       setPhase("done")
     } catch (e: any) {
@@ -322,6 +330,17 @@ export default function LocalizeStudio() {
                 <CardDescription>Alege limbile în care vrei să traduci subtitrările și titlul</CardDescription>
               </CardHeader>
               <CardContent>
+                {/* Title & Description Inputs */}
+                <div className="space-y-3 mb-4">
+                  <div>
+                    <Label className="text-sm font-medium text-foreground">Titlu (opțional)</Label>
+                    <Input placeholder="Titlu pentru traducere" value={metaTitle} onChange={(e) => setMetaTitle(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-foreground">Descriere (opțional)</Label>
+                    <Textarea placeholder="Descriere pentru traducere" value={metaDescription} onChange={(e) => setMetaDescription(e.target.value)} />
+                  </div>
+                </div>
                 <div className="flex items-center justify-end mb-3">
                   <Button variant="outline" size="sm" onClick={selectAllLanguages} className="bg-transparent mr-2">
                     Selectează toate
@@ -566,6 +585,45 @@ export default function LocalizeStudio() {
                         </Button>
                       </div>
                     </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Titluri & Descrieri traduse */}
+            <Card className="border-border">
+              <CardHeader>
+                <CardTitle className="text-foreground">Titluri & Descrieri traduse</CardTitle>
+                <CardDescription>Copiere rapidă pentru fiecare limbă</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {translatedMeta.map((item) => (
+                    <Card key={item.language} className="border-border">
+                      <CardHeader>
+                        <CardTitle className="text-foreground">{item.language.toUpperCase()}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div>
+                          <Label className="text-sm text-foreground">Titlu</Label>
+                          <div className="p-3 bg-muted border border-border rounded text-sm text-foreground">
+                            {item.title}
+                          </div>
+                          <Button variant="outline" size="sm" className="mt-2 border-border bg-transparent" onClick={async () => {
+                            await navigator.clipboard.writeText(item.title)
+                          }}>Copiază titlul</Button>
+                        </div>
+                        <div>
+                          <Label className="text-sm text-foreground">Descriere</Label>
+                          <div className="p-3 bg-muted border border-border rounded text-sm text-foreground max-h-[180px] overflow-y-auto">
+                            <pre className="whitespace-pre-wrap font-sans">{item.description}</pre>
+                          </div>
+                          <Button variant="outline" size="sm" className="mt-2 border-border bg-transparent" onClick={async () => {
+                            await navigator.clipboard.writeText(item.description)
+                          }}>Copiază descrierea</Button>
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
               </CardContent>

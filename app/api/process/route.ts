@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { segmentsToSrt, transcribeFromYoutubeUrl } from "@/lib/providers/stt"
-import { proofreadSrtPreserveTiming, translateSrtPreserveTiming } from "@/lib/providers/translate"
+import { proofreadSrtPreserveTiming, translateSrtPreserveTiming, translateTitleAndDescription } from "@/lib/providers/translate"
 import { fetchPreferredCaptions, fetchCaptionsSrtFromTrack, getVideoDetails } from "@/lib/providers/youtube"
 import { sbvToSrt } from "@/lib/utils"
 
@@ -31,6 +31,8 @@ export async function POST(request: Request) {
     const {
       youtubeUrl,
       title,
+      metaTitle,
+      metaDescription,
       sourceLanguage = "auto",
       targetLanguages = [],
       generateSubtitles = true,
@@ -51,15 +53,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Provide youtubeUrl, srtContent or sbvContent" }, { status: 400 })
     }
 
-    let baseTitle = title || (youtubeUrl ? "YouTube video" : "Proiect")
-    let baseDescription: string | undefined
+    let baseTitle = metaTitle || title || (youtubeUrl ? "YouTube video" : "Proiect")
+    let baseDescription: string | undefined = metaDescription
     if (youtubeUrl) {
       const details = await getVideoDetails(youtubeUrl)
       if (details) {
-        if (!title && details.title) baseTitle = details.title
-        baseDescription = details.description
+        if (!baseTitle && details.title) baseTitle = details.title
+        if (!baseDescription && details.description) baseDescription = details.description
       }
     }
+    if (!baseDescription) baseDescription = "Descriere automată"
 
     // Prepare RO SRT
     let roSrt = ""
@@ -114,6 +117,7 @@ export async function POST(request: Request) {
     }
 
     const artifacts: OutArtifact[] = []
+    const titlesDescriptions: Array<{ language: string; title: string; description: string }> = []
     const root = slugify(baseTitle)
 
     if (generateSubtitles) {
@@ -150,6 +154,12 @@ export async function POST(request: Request) {
             sizeBytes: srt.length,
             content: srt,
           })
+
+          // Translate title & description for this language
+          try {
+            const td = await translateTitleAndDescription(baseTitle, baseDescription ?? "Descriere automată", lang)
+            titlesDescriptions.push({ language: lang, title: td.title, description: td.description })
+          } catch {}
         } catch (e) {
           continue
         }
@@ -161,6 +171,7 @@ export async function POST(request: Request) {
       title: baseTitle,
       transcriptSource,
       artifacts,
+      titlesDescriptions,
     })
   } catch (error) {
     console.error("/api/process error", error)
