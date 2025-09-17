@@ -20,6 +20,54 @@ function slugify(input: string): string {
     .replace(/^_+|_+$/g, "")
 }
 
+function resolveLanguageNameRo(code: string): string {
+  const c = (code || "").toLowerCase()
+  const map: Record<string, string> = {
+    sq: "albaneză",
+    ar: "arabă",
+    bs: "bosniacă",
+    bg: "bulgară",
+    cs: "cehă",
+    zh: "chineză",
+    ko: "coreeană",
+    co: "corsicană",
+    hr: "croată",
+    da: "daneză",
+    he: "ebraică",
+    en: "engleză",
+    et: "estonă",
+    fi: "finlandeză",
+    fr: "franceză",
+    ka: "georgiană",
+    de: "germană",
+    el: "greacă",
+    id: "indoneziană",
+    it: "italiană",
+    ja: "japoneză",
+    lv: "letonă",
+    lt: "lituaniană",
+    mk: "macedoneană",
+    hu: "maghiară",
+    mn: "mongolă",
+    nl: "neerlandeză",
+    no: "norvegiană",
+    fa: "persană",
+    pl: "poloneză",
+    pt: "portugheză",
+    ro: "română",
+    ru: "rusă",
+    sr: "sârbă",
+    sk: "slovacă",
+    sl: "slovenă",
+    es: "spaniolă",
+    sv: "suedeză",
+    th: "thailandeză",
+    tr: "turcă",
+    vi: "vietnameză",
+  }
+  return map[c] || code
+}
+
 export async function POST(request: Request) {
   try {
     const contentType = request.headers.get("content-type") || ""
@@ -123,7 +171,7 @@ export async function POST(request: Request) {
     if (generateSubtitles) {
       artifacts.push({
         language: "ro",
-        filename: `${root}_ro.srt`,
+        filename: `${root}_${slugify("română")}.srt`,
         contentType: "application/x-subrip",
         type: "subtitle-srt",
         sizeBytes: roSrt.length,
@@ -146,9 +194,10 @@ export async function POST(request: Request) {
           // Proofread translated subtitles as well
           srt = await proofreadSrtPreserveTiming(srt, lang)
           console.log("[process] translated+proofread", { lang, bytes: srt.length })
+          const roName = resolveLanguageNameRo(lang)
           artifacts.push({
             language: lang,
-            filename: `${root}_${lang}.srt`,
+            filename: `${root}_${slugify(roName)}.srt`,
             contentType: "application/x-subrip",
             type: "subtitle-srt",
             sizeBytes: srt.length,

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Upload, FileVideo, Download, Play, Package, Eye, CheckCircle } from "lucide-react"
+import { Upload, FileVideo, Download, Play, Package, Eye, CheckCircle, Copy } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import JSZip from "jszip"
@@ -609,18 +609,26 @@ export default function LocalizeStudio() {
                           <div className="p-3 bg-muted border border-border rounded text-sm text-foreground">
                             {item.title}
                           </div>
-                          <Button variant="outline" size="sm" className="mt-2 border-border bg-transparent" onClick={async () => {
+                          <Button size="sm" className="mt-2 bg-primary hover:bg-primary/90 text-white" onClick={async () => {
                             await navigator.clipboard.writeText(item.title)
-                          }}>Copiază titlul</Button>
+                            toast({ title: "Copiat", description: "Titlul a fost copiat." })
+                          }}>
+                            <Copy className="w-4 h-4 mr-2" />
+                            Copiază titlul
+                          </Button>
                         </div>
                         <div>
                           <Label className="text-sm text-foreground">Descriere</Label>
                           <div className="p-3 bg-muted border border-border rounded text-sm text-foreground max-h-[180px] overflow-y-auto">
                             <pre className="whitespace-pre-wrap font-sans">{item.description}</pre>
                           </div>
-                          <Button variant="outline" size="sm" className="mt-2 border-border bg-transparent" onClick={async () => {
+                          <Button size="sm" className="mt-2 bg-primary hover:bg-primary/90 text-white" onClick={async () => {
                             await navigator.clipboard.writeText(item.description)
-                          }}>Copiază descrierea</Button>
+                            toast({ title: "Copiat", description: "Descrierea a fost copiată." })
+                          }}>
+                            <Copy className="w-4 h-4 mr-2" />
+                            Copiază descrierea
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
