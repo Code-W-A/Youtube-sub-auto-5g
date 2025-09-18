@@ -70,6 +70,12 @@ function resolveLanguageNameRo(code: string): string {
 
 export async function POST(request: Request) {
   try {
+    const logs: string[] = []
+    const addLog = (msg: string, data?: any) => {
+      const line = data ? `${msg} ${JSON.stringify(data)}` : msg
+      logs.push(line)
+      console.log(msg, data ?? "")
+    }
     const contentType = request.headers.get("content-type") || ""
     if (!contentType.includes("application/json")) {
       return NextResponse.json({ error: "Unsupported content-type" }, { status: 415 })
@@ -90,7 +96,7 @@ export async function POST(request: Request) {
       sbvContent,
     } = body ?? {}
 
-    console.log("[process] start", {
+    addLog("[process] start", {
       hasYoutube: Boolean(youtubeUrl),
       hasSrt: typeof srtContent === "string" && srtContent?.length > 0,
       hasSbv: typeof sbvContent === "string" && sbvContent?.length > 0,
@@ -147,13 +153,13 @@ export async function POST(request: Request) {
       transcriptSource = "sample"
     }
 
-    console.log("[process] transcript prepared", { transcriptSource, roSrtBytes: roSrt.length })
+    addLog("[process] transcript prepared", { transcriptSource, roSrtBytes: roSrt.length })
 
     // Proofread RO subtitles (grammar + diacritics), preserving timings
     if (generateSubtitles) {
       roSrt = await proofreadSrtPreserveTiming(roSrt, "ro")
     }
-    console.log("[process] ro proofread", { roSrtBytes: roSrt.length })
+    addLog("[process] ro proofread", { roSrtBytes: roSrt.length })
 
     type OutArtifact = {
       language: string
@@ -166,12 +172,13 @@ export async function POST(request: Request) {
 
     const artifacts: OutArtifact[] = []
     const titlesDescriptions: Array<{ language: string; title: string; description: string }> = []
-    const root = slugify(baseTitle)
+  const root = slugify(baseTitle)
+  const titleSnippet = root.split("_").slice(0, 6).join("_") || root
 
     if (generateSubtitles) {
       artifacts.push({
         language: "ro",
-        filename: `${root}_${slugify("română")}.srt`,
+      filename: `${slugify("română")}_${titleSnippet}.srt`,
         contentType: "application/x-subrip",
         type: "subtitle-srt",
         sizeBytes: roSrt.length,
@@ -188,16 +195,17 @@ export async function POST(request: Request) {
               srt = await fetchCaptionsSrtFromTrack(selectedTrack, lang)
             } catch {}
           }
+          addLog("[process] translate start", { lang })
           if (!srt) {
             srt = await translateSrtPreserveTiming(roSrt, lang)
           }
           // Proofread translated subtitles as well
           srt = await proofreadSrtPreserveTiming(srt, lang)
-          console.log("[process] translated+proofread", { lang, bytes: srt.length })
-          const roName = resolveLanguageNameRo(lang)
+          addLog("[process] translated+proofread", { lang, bytes: srt.length })
+        const roName = resolveLanguageNameRo(lang)
           artifacts.push({
             language: lang,
-            filename: `${root}_${slugify(roName)}.srt`,
+          filename: `${slugify(roName)}_${titleSnippet}.srt`,
             contentType: "application/x-subrip",
             type: "subtitle-srt",
             sizeBytes: srt.length,
@@ -208,19 +216,24 @@ export async function POST(request: Request) {
           try {
             const td = await translateTitleAndDescription(baseTitle, baseDescription ?? "Descriere automată", lang)
             titlesDescriptions.push({ language: lang, title: td.title, description: td.description })
-          } catch {}
+            addLog("[process] meta translated", { lang, titleLen: td.title.length })
+          } catch (e) {
+            addLog("[process] meta translate failed", { lang })
+          }
         } catch (e) {
+          addLog("[process] translate failed", { lang })
           continue
         }
       }
     }
 
-    console.log("[process] done", { artifacts: artifacts.length })
+    addLog("[process] done", { artifacts: artifacts.length })
     return NextResponse.json({
       title: baseTitle,
       transcriptSource,
       artifacts,
       titlesDescriptions,
+      debugLogs: logs,
     })
   } catch (error) {
     console.error("/api/process error", error)

@@ -81,6 +81,8 @@ export default function LocalizeStudio() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [phase, setPhase] = useState<"idle" | "processing" | "done" | "error">("idle")
   const [progress, setProgress] = useState(0)
+  const [statusText, setStatusText] = useState<string>("")
+  const [errorText, setErrorText] = useState<string>("")
   const progressTimerRef = useRef<number | null>(null)
 
   const [projectTitle, setProjectTitle] = useState<string>("Rezultate procesare")
@@ -249,7 +251,7 @@ export default function LocalizeStudio() {
         body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error("Import failed")
-      const data: { title: string; transcriptSource?: string; artifacts: ApiArtifact[]; titlesDescriptions?: Array<{ language: string; title: string; description: string }> } = await res.json()
+      const data: { title: string; transcriptSource?: string; artifacts: ApiArtifact[]; titlesDescriptions?: Array<{ language: string; title: string; description: string }>; debugLogs?: string[] } = await res.json()
       console.log("[client] process done", { artifacts: data.artifacts?.length || 0 })
       setProjectTitle(data.title || "Rezultate procesare")
       const src = data.transcriptSource
@@ -262,6 +264,9 @@ export default function LocalizeStudio() {
       setTranscriptInfo(info)
       setArtifacts(data.artifacts || [])
       setTranslatedMeta(data.titlesDescriptions || [])
+      // Show last meaningful status from logs
+      const last = data.debugLogs?.slice(-1)[0]
+      if (last) setStatusText(last)
       setProgress(100)
       setPhase("done")
     } catch (e: any) {
@@ -271,6 +276,7 @@ export default function LocalizeStudio() {
         description: e?.message || "Încearcă din nou.",
         variant: "destructive",
       })
+      setErrorText(e?.message || "Eroare necunoscută")
       setIsSubmitting(false)
       setPhase("error")
     }
@@ -434,6 +440,7 @@ export default function LocalizeStudio() {
                       <div className="h-2 bg-primary transition-all" style={{ width: `${progress}%` }} />
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">{progress}%</p>
+                    {statusText && <p className="text-xs text-foreground mt-2">{statusText}</p>}
                   </div>
                 ) : phase === "done" ? (
                   <div className="text-center py-4">
@@ -441,6 +448,7 @@ export default function LocalizeStudio() {
                       <CheckCircle className="w-8 h-8 text-green-500" />
                     </div>
                     <p className="text-sm text-foreground">Procesare completă</p>
+                    {statusText && <p className="text-xs text-muted-foreground mt-1">{statusText}</p>}
                   </div>
                 ) : (
                   <div className="text-center py-4">
@@ -448,6 +456,7 @@ export default function LocalizeStudio() {
                       <FileVideo className="w-8 h-8 text-muted-foreground" />
                     </div>
                     <p className="text-sm text-muted-foreground">Niciun job în procesare</p>
+                    {errorText && <p className="text-xs text-red-500 mt-1">{errorText}</p>}
                   </div>
                 )}
               </CardContent>
@@ -601,7 +610,10 @@ export default function LocalizeStudio() {
                   {translatedMeta.map((item) => (
                     <Card key={item.language} className="border-border">
                       <CardHeader>
-                        <CardTitle className="text-foreground">{item.language.toUpperCase()}</CardTitle>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-lg">{languageMeta[item.language]?.flag}</span>
+                          <CardTitle className="text-foreground">{languageMeta[item.language]?.name || item.language.toUpperCase()}</CardTitle>
+                        </div>
                       </CardHeader>
                       <CardContent className="space-y-3">
                         <div>
