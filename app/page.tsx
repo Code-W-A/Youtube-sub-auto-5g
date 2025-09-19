@@ -83,12 +83,18 @@ export default function LocalizeStudio() {
   const [progress, setProgress] = useState(0)
   const [statusText, setStatusText] = useState<string>("")
   const [errorText, setErrorText] = useState<string>("")
+  const [debugLogs, setDebugLogs] = useState<string[]>([])
+  const [showLogs, setShowLogs] = useState<boolean>(false)
   const progressTimerRef = useRef<number | null>(null)
 
   const [projectTitle, setProjectTitle] = useState<string>("Rezultate procesare")
   const [transcriptInfo, setTranscriptInfo] = useState<string>("")
   const [artifacts, setArtifacts] = useState<ApiArtifact[]>([])
   const [translatedMeta, setTranslatedMeta] = useState<Array<{ language: string; title: string; description: string }>>([])
+  const [langStatuses, setLangStatuses] = useState<Record<string, "pending" | "processing" | "done" | "error">>({})
+  const [preparedRoSrt, setPreparedRoSrt] = useState<string>("")
+  const [preparedBaseTitle, setPreparedBaseTitle] = useState<string>("")
+  const [preparedBaseDescription, setPreparedBaseDescription] = useState<string>("")
 
   const handleSrtSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
@@ -229,32 +235,33 @@ export default function LocalizeStudio() {
     setProgress(0)
     try {
       console.log("[client] submit start", { hasSrt: Boolean(selectedSrt), hasSbv: Boolean(selectedSbv), targets: targetLanguages.length })
-      const payload: any = {
+      // Step 1: prepare
+      const preparePayload: any = {
         title: selectedSrt?.name || selectedSbv?.name,
         metaTitle,
         metaDescription,
         sourceLanguage,
-        targetLanguages,
-        generateSubtitles,
-        generateTranslations,
       }
       if (selectedSrt) {
         const txt = await selectedSrt.text()
-        payload.srtContent = txt
+        preparePayload.srtContent = txt
       } else if (selectedSbv) {
         const txt = await selectedSbv.text()
-        payload.sbvContent = txt
+        preparePayload.sbvContent = txt
       }
-      const res = await fetch("/api/process", {
+      setStatusText("Pregătire transcript (RO)...")
+      const prepRes = await fetch("/api/process/prepare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(preparePayload),
       })
-      if (!res.ok) throw new Error("Import failed")
-      const data: { title: string; transcriptSource?: string; artifacts: ApiArtifact[]; titlesDescriptions?: Array<{ language: string; title: string; description: string }>; debugLogs?: string[] } = await res.json()
-      console.log("[client] process done", { artifacts: data.artifacts?.length || 0 })
-      setProjectTitle(data.title || "Rezultate procesare")
-      const src = data.transcriptSource
+      if (!prepRes.ok) throw new Error("Pregătirea a eșuat")
+      const prep: { baseTitle: string; baseDescription?: string; roSrt: string; transcriptSource?: string } = await prepRes.json()
+      setPreparedRoSrt(prep.roSrt)
+      setPreparedBaseTitle(prep.baseTitle)
+      setPreparedBaseDescription(prep.baseDescription || "Descriere automată")
+      setProjectTitle(prep.baseTitle || "Rezultate procesare")
+      const src = prep.transcriptSource
       let info = ""
       if (src === "captions") info = "Sursă transcript: Captions"
       else if (src === "stt") info = "Sursă transcript: STT (fallback)"
@@ -262,12 +269,53 @@ export default function LocalizeStudio() {
       else if (src === "uploaded") info = "Sursă transcript: SRT încărcat"
       else info = "Sursă transcript: Necunoscut"
       setTranscriptInfo(info)
-      setArtifacts(data.artifacts || [])
-      setTranslatedMeta(data.titlesDescriptions || [])
-      // Show last meaningful status from logs
-      const last = data.debugLogs?.slice(-1)[0]
-      if (last) setStatusText(last)
-      setProgress(100)
+      setProgress(10)
+
+      // Initialize per-language statuses
+      const initialStatuses: Record<string, "pending" | "processing" | "done" | "error"> = {}
+      for (const code of targetLanguages) initialStatuses[code] = "pending"
+      setLangStatuses(initialStatuses)
+
+      // Helpers for file names consistent with server
+      const slugify = (input: string) => input.toLowerCase().normalize("NFD").replace(/[^\w\s-]/g, "").trim().replace(/[\s_-]+/g, "_").replace(/^_+|_+$/g, "")
+      const resolveLanguageNameRo = (code: string) => {
+        const map: Record<string, string> = { sq:"albaneză", ar:"arabă", bs:"bosniacă", bg:"bulgară", cs:"cehă", zh:"chineză", ko:"coreeană", co:"corsicană", hr:"croată", da:"daneză", he:"ebraică", en:"engleză", et:"estonă", fi:"finlandeză", fr:"franceză", ka:"georgiană", de:"germană", el:"greacă", id:"indoneziană", it:"italiană", ja:"japoneză", lv:"letonă", lt:"lituaniană", mk:"macedoneană", hu:"maghiară", mn:"mongolă", nl:"neerlandeză", no:"norvegiană", fa:"persană", pl:"poloneză", pt:"portugheză", ro:"română", ru:"rusă", sr:"sârbă", sk:"slovacă", sl:"slovenă", es:"spaniolă", sv:"suedeză", th:"thailandeză", tr:"turcă", vi:"vietnameză" }
+        return map[(code || "").toLowerCase()] || code
+      }
+      const root = slugify(prep.baseTitle || "proiect")
+      const titleSnippet = root.split("_").slice(0, 6).join("_") || root
+
+      // Step 2: process each language sequentially
+      const newArtifacts: ApiArtifact[] = []
+      const newMeta: Array<{ language: string; title: string; description: string }> = []
+      for (let i = 0; i < targetLanguages.length; i++) {
+        const lang = targetLanguages[i]
+        setStatusText(`Traducere în curs: ${languageMeta[lang]?.name || lang.toUpperCase()}`)
+        setLangStatuses((prev) => ({ ...prev, [lang]: "processing" }))
+        try {
+          const langRes = await fetch("/api/process/language", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ roSrt: prep.roSrt, baseTitle: prep.baseTitle, baseDescription: prep.baseDescription, language: lang }),
+          })
+          if (!langRes.ok) throw new Error(`Eșec traducere ${lang}`)
+          const lr: { language: string; srt: string; title: string; description: string } = await langRes.json()
+          const roName = resolveLanguageNameRo(lang)
+          const filename = `${slugify(roName)}_${titleSnippet}.srt`
+          newArtifacts.push({ language: lang, filename, contentType: "application/x-subrip", type: "subtitle-srt", sizeBytes: lr.srt.length, content: lr.srt })
+          newMeta.push({ language: lang, title: lr.title, description: lr.description })
+          setArtifacts([...newArtifacts])
+          setTranslatedMeta([...newMeta])
+          setLangStatuses((prev) => ({ ...prev, [lang]: "done" }))
+        } catch (err: any) {
+          setLangStatuses((prev) => ({ ...prev, [lang]: "error" }))
+          setErrorText(err?.message || `Eroare la ${lang}`)
+        }
+        const ratio = (i + 1) / Math.max(1, targetLanguages.length)
+        setProgress(10 + Math.floor(ratio * 90))
+      }
+
+      setStatusText("Finalizat")
       setPhase("done")
     } catch (e: any) {
       console.error("[client] process error", e)
@@ -441,6 +489,27 @@ export default function LocalizeStudio() {
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">{progress}%</p>
                     {statusText && <p className="text-xs text-foreground mt-2">{statusText}</p>}
+                    {debugLogs.length > 0 && (
+                      <div className="mt-2">
+                        <Button variant="outline" size="sm" className="bg-transparent border-border" onClick={() => setShowLogs((s) => !s)}>
+                          {showLogs ? "Ascunde detalii" : "Afișează detalii"}
+                        </Button>
+                        {showLogs && (
+                          <div className="mt-2 text-left max-h-48 overflow-auto bg-muted border border-border rounded p-2 text-xs font-mono whitespace-pre-wrap">
+                            {debugLogs.join("\n")}
+                            <div className="mt-2 flex justify-end">
+                              <Button size="sm" className="bg-primary hover:bg-primary/90 text-white" onClick={async () => {
+                                await navigator.clipboard.writeText(debugLogs.join("\n"))
+                                toast({ title: "Copiat", description: "Logurile au fost copiate.", duration: 3000 })
+                              }}>
+                                <Copy className="w-4 h-4 mr-2" />
+                                Copiază logurile
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ) : phase === "done" ? (
                   <div className="text-center py-4">
@@ -449,6 +518,27 @@ export default function LocalizeStudio() {
                     </div>
                     <p className="text-sm text-foreground">Procesare completă</p>
                     {statusText && <p className="text-xs text-muted-foreground mt-1">{statusText}</p>}
+                    {debugLogs.length > 0 && (
+                      <div className="mt-2">
+                        <Button variant="outline" size="sm" className="bg-transparent border-border" onClick={() => setShowLogs((s) => !s)}>
+                          {showLogs ? "Ascunde detalii" : "Afișează detalii"}
+                        </Button>
+                        {showLogs && (
+                          <div className="mt-2 text-left max-h-48 overflow-auto bg-muted border border-border rounded p-2 text-xs font-mono whitespace-pre-wrap">
+                            {debugLogs.join("\n")}
+                            <div className="mt-2 flex justify-end">
+                              <Button size="sm" className="bg-primary hover:bg-primary/90 text-white" onClick={async () => {
+                                await navigator.clipboard.writeText(debugLogs.join("\n"))
+                                toast({ title: "Copiat", description: "Logurile au fost copiate.", duration: 3000 })
+                              }}>
+                                <Copy className="w-4 h-4 mr-2" />
+                                Copiază logurile
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-4">
