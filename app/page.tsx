@@ -301,16 +301,14 @@ export default function LocalizeStudio() {
             const langRes = await fetch("/api/process/language", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ roSrt: prep.roSrt, baseTitle: prep.baseTitle, baseDescription: prep.baseDescription, language: lang }),
+              body: JSON.stringify({ roSrt: prep.roSrt, baseTitle: prep.baseTitle, baseDescription: prep.baseDescription, language: lang, translateMeta: false }),
             })
             if (!langRes.ok) throw new Error(`Eșec traducere ${lang}`)
             const lr: { language: string; srt: string; title: string; description: string } = await langRes.json()
             const roName = resolveLanguageNameRo(lang)
             const filename = `${slugify(roName)}_${titleSnippet}.srt`
             newArtifacts.push({ language: lang, filename, contentType: "application/x-subrip", type: "subtitle-srt", sizeBytes: lr.srt.length, content: lr.srt })
-            newMeta.push({ language: lang, title: lr.title, description: lr.description })
             setArtifacts([...newArtifacts])
-            setTranslatedMeta([...newMeta])
             setLangStatuses((prev) => ({ ...prev, [lang]: "done" }))
           } catch (err: any) {
             setLangStatuses((prev) => ({ ...prev, [lang]: "error" }))

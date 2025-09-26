@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { proofreadSrtPreserveTiming, translateSrtPreserveTiming, translateTitleAndDescription } from "@/lib/providers/translate"
+import { translateSrtPreserveTiming, translateTitleAndDescription } from "@/lib/providers/translate"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -13,18 +13,23 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { roSrt, baseTitle, baseDescription, language } = body ?? {}
+    const { roSrt, baseTitle, baseDescription, language, translateMeta = false } = body ?? {}
     if (!roSrt || !language) return NextResponse.json({ error: "Missing roSrt or language" }, { status: 400 })
 
-    let srt: string | null = await translateSrtPreserveTiming(roSrt, language)
-    srt = await proofreadSrtPreserveTiming(srt, language)
-    const td = await translateTitleAndDescription(baseTitle || "Proiect", baseDescription || "Descriere automată", language)
+    const srt: string | null = await translateSrtPreserveTiming(roSrt, language)
+    let title = ""
+    let description = ""
+    if (translateMeta) {
+      const td = await translateTitleAndDescription(baseTitle || "Proiect", baseDescription || "Descriere automată", language)
+      title = td.title
+      description = td.description
+    }
 
     return NextResponse.json({
       language,
       srt,
-      title: td.title,
-      description: td.description,
+      title,
+      description,
     })
   } catch (error) {
     console.error("/api/process/language error", error)
