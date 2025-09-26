@@ -285,35 +285,49 @@ export default function LocalizeStudio() {
       const root = slugify(prep.baseTitle || "proiect")
       const titleSnippet = root.split("_").slice(0, 6).join("_") || root
 
-      // Step 2: process each language sequentially
+      // Step 2: process languages with bounded parallelism (2 at a time)
       const newArtifacts: ApiArtifact[] = []
       const newMeta: Array<{ language: string; title: string; description: string }> = []
-      for (let i = 0; i < targetLanguages.length; i++) {
-        const lang = targetLanguages[i]
-        setStatusText(`Traducere în curs: ${languageMeta[lang]?.name || lang.toUpperCase()}`)
-        setLangStatuses((prev) => ({ ...prev, [lang]: "processing" }))
-        try {
-          const langRes = await fetch("/api/process/language", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ roSrt: prep.roSrt, baseTitle: prep.baseTitle, baseDescription: prep.baseDescription, language: lang }),
-          })
-          if (!langRes.ok) throw new Error(`Eșec traducere ${lang}`)
-          const lr: { language: string; srt: string; title: string; description: string } = await langRes.json()
-          const roName = resolveLanguageNameRo(lang)
-          const filename = `${slugify(roName)}_${titleSnippet}.srt`
-          newArtifacts.push({ language: lang, filename, contentType: "application/x-subrip", type: "subtitle-srt", sizeBytes: lr.srt.length, content: lr.srt })
-          newMeta.push({ language: lang, title: lr.title, description: lr.description })
-          setArtifacts([...newArtifacts])
-          setTranslatedMeta([...newMeta])
-          setLangStatuses((prev) => ({ ...prev, [lang]: "done" }))
-        } catch (err: any) {
-          setLangStatuses((prev) => ({ ...prev, [lang]: "error" }))
-          setErrorText(err?.message || `Eroare la ${lang}`)
+      const concurrency = 2
+      const queue = [...targetLanguages]
+      let processed = 0
+
+      const worker = async () => {
+        while (queue.length > 0) {
+          const lang = queue.shift() as string
+          setStatusText(`Traducere în curs: ${languageMeta[lang]?.name || lang.toUpperCase()}`)
+          setLangStatuses((prev) => ({ ...prev, [lang]: "processing" }))
+          try {
+            const langRes = await fetch("/api/process/language", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ roSrt: prep.roSrt, baseTitle: prep.baseTitle, baseDescription: prep.baseDescription, language: lang }),
+            })
+            if (!langRes.ok) throw new Error(`Eșec traducere ${lang}`)
+            const lr: { language: string; srt: string; title: string; description: string } = await langRes.json()
+            const roName = resolveLanguageNameRo(lang)
+            const filename = `${slugify(roName)}_${titleSnippet}.srt`
+            newArtifacts.push({ language: lang, filename, contentType: "application/x-subrip", type: "subtitle-srt", sizeBytes: lr.srt.length, content: lr.srt })
+            newMeta.push({ language: lang, title: lr.title, description: lr.description })
+            setArtifacts([...newArtifacts])
+            setTranslatedMeta([...newMeta])
+            setLangStatuses((prev) => ({ ...prev, [lang]: "done" }))
+          } catch (err: any) {
+            setLangStatuses((prev) => ({ ...prev, [lang]: "error" }))
+            setErrorText(err?.message || `Eroare la ${lang}`)
+          } finally {
+            processed += 1
+            const ratio = processed / Math.max(1, targetLanguages.length)
+            setProgress(10 + Math.floor(ratio * 90))
+          }
         }
-        const ratio = (i + 1) / Math.max(1, targetLanguages.length)
-        setProgress(10 + Math.floor(ratio * 90))
       }
+
+      const workers: Promise<void>[] = []
+      for (let i = 0; i < Math.min(concurrency, targetLanguages.length); i++) {
+        workers.push(worker())
+      }
+      await Promise.all(workers)
 
       setStatusText("Finalizat")
       setPhase("done")

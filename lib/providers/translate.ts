@@ -167,7 +167,7 @@ export async function translateSrtPreserveTiming(srt: string, targetLanguageCode
   }
   // Robust approach: split SRT into chunks by blocks, translate chunks with retry, validate structure
   const blocks = srt.split(/\n\n+/g)
-  const chunkSize = 40 // blocks per chunk
+  const chunkSize = 20 // smaller chunks for lower latency per request
   const chunks: string[][] = []
   for (let i = 0; i < blocks.length; i += chunkSize) {
     chunks.push(blocks.slice(i, i + chunkSize))
